@@ -3,6 +3,10 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 11:45 - 챗봇 FAQ를 전 언어 동일한 5개 질문 구조로 통일
+- `src/data/chatbotFaq.js`의 EN, ES, FR, KR FAQ를 모두 `product`, `strengths`, `audience`, `channels`, `proposal` 순서의 5개 구조로 재정리
+- 대장님이 전달한 문안을 기준으로 각 언어의 질문과 답변을 교체해, 화면 언어가 달라도 같은 정보 구조를 유지하도록 정리
+
 ## 2026-03-14 11:39 - 뉴스정보 전체 삭제 시 `/Space` 재생성 방지
 - `src/utils/adminSettings.js`의 `parseTickerTextarea`가 완전히 빈 문자열을 `['']`로 잘못 해석하던 문제를 수정
 - 이제 `모든 내용 삭제` 후 저장하면 EN, FR, ES, KR 입력값이 실제 빈 배열로 유지되어 `/Space` 토큰이 다시 생기지 않도록 정리
