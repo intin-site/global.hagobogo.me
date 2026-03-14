@@ -15,6 +15,10 @@ export function formatTickerTextarea(items) {
 }
 
 export function parseTickerTextarea(value) {
+    if (typeof value !== 'string' || value.trim() === '') {
+        return [];
+    }
+
     return value
         .split('\n')
         .map((item) => {
