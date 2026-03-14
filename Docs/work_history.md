@@ -3,6 +3,12 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 15:33 - 문의 시트 수식 인젝션 차단과 중복 차단 키 개선, Dot_blue 순서 검증 추가
+- `apps-script/business-inquiry/Code.gs`에서 문의 입력값을 시트에 저장하기 전에 수식 시작 문자(`=`, `+`, `-`, `@`)를 텍스트로 강제 변환해 구글 시트 Formula Injection 위험을 줄이도록 보강
+- 중복 접수 차단 키를 `이메일 단독`에서 `이름 + 회사명 + 이메일 + 문의 내용` 기반 동일 문의 지문으로 변경해 특정 이메일만 반복 차단되는 구조적 약점을 완화
+- `src/components/AdminPage.jsx`, `apps-script/business-inquiry/Code.gs`에 Dot_blue 최소값이 최대값보다 클 수 없도록 명시 검증을 추가해 관리자 입력 실수를 저장 전에 바로 차단
+- 검증 결과 `npm run lint`, `npm run build` 모두 통과 확인
+
 ## 2026-03-14 15:14 - Apps Script 잠금과 API timeout, 탭 복귀 재조회 throttle 보강
 - `apps-script/business-inquiry/Code.gs`에 전역 잠금 헬퍼를 추가하고 관리자 설정 저장을 `setProperties()` 일괄 기록으로 바꿔 동시 저장 충돌과 반쪽 저장 가능성을 줄이도록 보강
 - 문의 시트 `appendRow()`와 상태 열 기록도 잠금 구간으로 감싸 동시에 접수될 때 행 번호와 상태 기록이 뒤섞이지 않도록 정리

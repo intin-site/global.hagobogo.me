@@ -80,12 +80,12 @@ function doPost(e) {
       sheet.appendRow([
         formatDateCell(submittedAt),
         formatTimeCell(submittedAt),
-        payload.name.trim(),
-        payload.title ? payload.title.trim() : '',
-        payload.country.trim(),
-        payload.companyName.trim(),
-        payload.email.trim(),
-        payload.inquiry.trim()
+        sanitizeSheetCellValue(payload.name),
+        sanitizeSheetCellValue(payload.title ? payload.title.trim() : ''),
+        sanitizeSheetCellValue(payload.country),
+        sanitizeSheetCellValue(payload.companyName),
+        sanitizeSheetCellValue(payload.email),
+        sanitizeSheetCellValue(payload.inquiry)
       ]);
 
       return {
@@ -560,6 +560,14 @@ function validateSiteSettingsPatch(siteSettings) {
         message: 'Dot_blue 발생 빈도는 1 이상의 숫자로 입력해야 합니다.'
       };
     }
+
+    if (min > max) {
+      return {
+        ok: false,
+        code: 'INVALID_DOT_BLUE_RANGE_ORDER',
+        message: 'Dot_blue 최소값은 최대값보다 클 수 없습니다.'
+      };
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(siteSettings, 'tickerItemsByLanguage')) {
@@ -597,22 +605,22 @@ function updateStatusCell(sheet, rowIndex, columnIndex, statusText) {
 }
 
 function checkSpamRisk(payload) {
-  // 같은 이메일이 너무 짧은 시간 안에 반복 접수되면 임시로 차단합니다.
-  const email = payload && payload.email ? payload.email.trim().toLowerCase() : '';
+  // 같은 문의 내용이 너무 짧은 시간 안에 반복 접수되면 임시로 차단합니다.
+  const submissionFingerprint = createSubmissionFingerprint(payload);
 
-  if (!email) {
+  if (!submissionFingerprint) {
     return null;
   }
 
   const cache = CacheService.getScriptCache();
-  const duplicateKey = `inquiry:${email}`;
+  const duplicateKey = `inquiry:${submissionFingerprint}`;
   const recentSubmission = cache.get(duplicateKey);
 
   if (recentSubmission) {
     return {
       ok: false,
       code: 'TOO_MANY_REQUESTS',
-      message: '같은 이메일로 너무 짧은 시간 안에 반복 접수되고 있습니다. 잠시 후 다시 시도해 주세요.'
+      message: '같은 문의 내용이 너무 짧은 시간 안에 반복 접수되고 있습니다. 잠시 후 다시 시도해 주세요.'
     };
   }
 
@@ -620,16 +628,49 @@ function checkSpamRisk(payload) {
 }
 
 function markSubmissionCache(payload) {
-  // 방금 접수된 이메일을 캐시에 기록해 중복 접수를 잠시 막습니다.
-  const email = payload && payload.email ? payload.email.trim().toLowerCase() : '';
+  // 방금 접수된 문의 지문을 캐시에 기록해 완전히 같은 문의의 반복 접수를 잠시 막습니다.
+  const submissionFingerprint = createSubmissionFingerprint(payload);
 
-  if (!email) {
+  if (!submissionFingerprint) {
     return;
   }
 
   CacheService
     .getScriptCache()
-    .put(`inquiry:${email}`, '1', DUPLICATE_SUBMISSION_WINDOW_SECONDS);
+    .put(`inquiry:${submissionFingerprint}`, '1', DUPLICATE_SUBMISSION_WINDOW_SECONDS);
+}
+
+function createSubmissionFingerprint(payload) {
+  // 이메일만으로 사용자를 막지 않도록 핵심 입력값을 합친 동일 문의 지문을 만듭니다.
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+
+  const name = normalizeSubmissionFingerprintValue(payload.name);
+  const companyName = normalizeSubmissionFingerprintValue(payload.companyName);
+  const email = normalizeSubmissionFingerprintValue(payload.email);
+  const inquiry = normalizeSubmissionFingerprintValue(payload.inquiry);
+
+  if (!name || !companyName || !email || !inquiry) {
+    return '';
+  }
+
+  return [name, companyName, email, inquiry].join('||');
+}
+
+function normalizeSubmissionFingerprintValue(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function sanitizeSheetCellValue(value) {
+  // 시트가 사용자 입력을 수식으로 해석하지 않도록 위험한 시작 문자는 텍스트로 고정합니다.
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+
+  if (!normalizedValue) {
+    return '';
+  }
+
+  return /^[=+\-@]/.test(normalizedValue) ? `'${normalizedValue}` : normalizedValue;
 }
 
 function truncateStatusMessage(message) {

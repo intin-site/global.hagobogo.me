@@ -241,6 +241,11 @@ export default function AdminPage() {
             return;
         }
 
+        if (minFrequency > maxFrequency) {
+            setDotBlueFrequencyMessage('최소값은 최대값보다 클 수 없습니다.');
+            return;
+        }
+
         try {
             const savedSettings = await saveAdminSettings(
                 adminPasswordRef.current,
@@ -478,7 +483,7 @@ export default function AdminPage() {
                                     : ''}
                             </p>
                         ) : null}
-                        {dotBlueFrequencyMessage ? <p className={`admin-message${dotBlueFrequencyMessage.includes('정수') || dotBlueFrequencyMessage.includes('실패') ? ' is-error' : ''}`}>{dotBlueFrequencyMessage}</p> : null}
+                        {dotBlueFrequencyMessage ? <p className={`admin-message${dotBlueFrequencyMessage.includes('정수') || dotBlueFrequencyMessage.includes('실패') || dotBlueFrequencyMessage.includes('최소값') ? ' is-error' : ''}`}>{dotBlueFrequencyMessage}</p> : null}
                         <div className="admin-actions admin-actions-center">
                             <button type="submit" className="admin-primary-button" disabled={isLoadingSettings}>발생 빈도 저장</button>
                         </div>
