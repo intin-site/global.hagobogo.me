@@ -48,6 +48,7 @@ export default function Dashboard() {
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
     const [sales, setSales] = useState(DEFAULT_SALES_COUNT);
+    const [isSalesVisible, setIsSalesVisible] = useState(false);
     const [language, setLanguage] = useState(() => {
         if (typeof window === 'undefined') {
             return DEFAULT_LANGUAGE;
@@ -77,6 +78,7 @@ export default function Dashboard() {
     const [targetMetrics, setTargetMetrics] = useState(createInitialTargetMetrics);
     const pulseTimeoutRef = useRef(null);
     const lineTimeoutRef = useRef(null);
+    const salesRevealTimeoutRef = useRef(null);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
     const proposalBoardRef = useRef(null);
@@ -102,13 +104,29 @@ export default function Dashboard() {
                 const normalizedSettings = normalizeAdminSiteSettings(nextSiteSettings);
                 setSiteSettings(normalizedSettings);
                 setSales(normalizedSettings.salesCount);
+
+                salesRevealTimeoutRef.current = window.setTimeout(() => {
+                    if (!isMounted) {
+                        return;
+                    }
+
+                    setIsSalesVisible(true);
+                }, 200);
             })
             .catch((error) => {
                 console.error('공개 사이트 설정을 불러오지 못했습니다.', error);
+
+                if (isMounted) {
+                    setIsSalesVisible(true);
+                }
             });
 
         return () => {
             isMounted = false;
+
+            if (salesRevealTimeoutRef.current) {
+                window.clearTimeout(salesRevealTimeoutRef.current);
+            }
         };
     }, []);
 
@@ -438,7 +456,13 @@ export default function Dashboard() {
                 <div ref={sphereGroupRef} className="relative flex items-center justify-center px-[20px] pt-[20px] pb-[20px] pointer-events-none">
                     <Sphere isLineHit={isLineHit} />
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <SalesCounter sales={sales} isPulsing={isPulsing} mode="center" copy={copy.salesCounter} />
+                        <SalesCounter
+                            sales={sales}
+                            isPulsing={isPulsing}
+                            isVisible={isSalesVisible}
+                            mode="center"
+                            copy={copy.salesCounter}
+                        />
                     </div>
                 </div>
 

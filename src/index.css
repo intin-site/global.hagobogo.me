@@ -57,6 +57,16 @@ body {
   }
 }
 
+@keyframes salesCounterReveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes sphereLinePulse {
   0% {
     border-color: rgba(255, 255, 255, 0.25);
@@ -120,6 +130,14 @@ body {
   font-size: 110px;
   font-weight: 200;
   color: #003664;
+}
+
+.sales-counter-hidden {
+  opacity: 0;
+}
+
+.sales-counter-appear {
+  animation: salesCounterReveal 3s ease forwards;
 }
 
 .sales-counter-value.is-pulsing {
@@ -731,6 +749,13 @@ body {
   line-height: 1.25;
 }
 
+.admin-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .admin-description {
   margin: 0;
   color: #6b737b;
@@ -958,6 +983,7 @@ body {
 .admin-page-footer-action {
   display: flex;
   justify-content: center;
+  margin-top: 40px;
   padding-top: 12px;
 }
 
@@ -998,6 +1024,30 @@ body {
 .admin-secondary-button {
   background: transparent;
   color: #4d545a;
+}
+
+.admin-inline-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(77, 84, 90, 0.2);
+  border-radius: 999px;
+  background: transparent;
+  color: #4d545a;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.admin-inline-secondary-button:hover,
+.admin-inline-secondary-button:focus-visible {
+  background: rgba(77, 84, 90, 0.08);
+  border-color: #4d545a;
+  outline: none;
 }
 
 .admin-secondary-button:hover,
@@ -1234,7 +1284,8 @@ body {
   display: flex;
   flex-direction: column;
   width: min(360px, calc(100vw - 32px));
-  max-height: min(620px, calc(100dvh - 144px));
+  height: min(530px, calc(100dvh - 72px));
+  max-height: min(530px, calc(100dvh - 72px));
   padding: 22px 20px 18px;
   border: 1px solid rgba(77, 84, 90, 0.14);
   border-radius: 28px;
@@ -1311,10 +1362,9 @@ body {
 
 .chatbot-panel-question-list {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 10px;
-  max-height: 250px;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -1410,6 +1460,7 @@ body {
 .chatbot-answer-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   margin-top: 14px;
 }
@@ -1503,8 +1554,8 @@ body {
     left: 16px;
     bottom: 82px;
     width: auto;
-    max-height: min(560px, calc(100dvh - 104px));
-    height: auto;
+    height: min(504px, calc(100dvh - 72px));
+    max-height: min(504px, calc(100dvh - 72px));
     padding: 18px 16px 18px;
     border-radius: 24px;
   }
@@ -1527,7 +1578,7 @@ body {
   }
 
   .chatbot-panel-question-list {
-    max-height: min(168px, 24dvh);
+    flex: 1 1 auto;
     gap: 8px;
     padding-right: 4px;
   }

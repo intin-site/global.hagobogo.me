@@ -52,6 +52,14 @@ function buildSiteSettingsFromForm({ notificationEmailInput, salesInput, dotBlue
     });
 }
 
+function isLocalAdminBypassEnabled() {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 export default function AdminPage() {
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminPasswordRef = useRef('');
@@ -128,6 +136,13 @@ export default function AdminPage() {
     const handleAuthenticate = async (event) => {
         event.preventDefault();
 
+        if (isLocalAdminBypassEnabled()) {
+            adminPasswordRef.current = passwordInput.trim() || 'LOCAL_DEV_BYPASS';
+            setPasswordError('');
+            setIsAuthenticated(true);
+            return;
+        }
+
         if (!passwordInput.trim()) {
             setPasswordError('비밀번호를 입력해 주세요.');
             return;
@@ -169,6 +184,16 @@ export default function AdminPage() {
         } catch (error) {
             setTickerMessage(error.message || '뉴스정보 저장에 실패했습니다.');
         }
+    };
+
+    const handleClearAllTickerInputs = () => {
+        setTickerInputs(
+            ADMIN_SETTING_LANGUAGES.reduce((accumulator, language) => {
+                accumulator[language] = [];
+                return accumulator;
+            }, {})
+        );
+        setTickerMessage('');
     };
 
     const handleSaveSales = async (event) => {
@@ -290,7 +315,7 @@ export default function AdminPage() {
                     <section className="admin-card">
                         <div className="admin-card-copy">
                             <p className="admin-eyebrow">ADMIN</p>
-                            <h1 className="admin-title">관리자 비밀번호를 입력해 주세요</h1>
+                            <h1 className="admin-section-title">관리자 비밀번호를 입력해 주세요</h1>
                             <p className="admin-description">
                                 관리자 페이지에서는 뉴스정보, 판매 수치, Dot_blue 발생 빈도, 알림 수신 메일 주소를 직접 수정할 수 있습니다.
                             </p>
@@ -303,7 +328,7 @@ export default function AdminPage() {
                                     type="password"
                                     value={passwordInput}
                                     onChange={(event) => setPasswordInput(event.target.value)}
-                                    className="admin-input"
+                                    className="admin-input admin-input-large"
                                     placeholder="비밀번호를 입력해 주세요"
                                     disabled={isAuthenticating}
                                 />
@@ -311,11 +336,11 @@ export default function AdminPage() {
 
                             {passwordError ? <p className="admin-message is-error">{passwordError}</p> : null}
 
-                            <div className="admin-actions">
+                            <div className="admin-actions admin-actions-center">
+                                <a href={homeHref} className="admin-secondary-button">취소하기</a>
                                 <button type="submit" className="admin-primary-button" disabled={isAuthenticating}>
                                     {isAuthenticating ? '확인 중...' : '입장하기'}
                                 </button>
-                                <a href={homeHref} className="admin-secondary-button">메인으로 돌아가기</a>
                             </div>
                         </form>
                     </section>
@@ -346,7 +371,16 @@ export default function AdminPage() {
                 <section className="admin-card">
                     <div className="admin-card-copy">
                         <p className="admin-eyebrow">NEWS TICKER</p>
-                        <h2 className="admin-section-title">뉴스정보(news ticker) 입력</h2>
+                        <div className="admin-section-title-row">
+                            <h2 className="admin-section-title">뉴스정보(news ticker) 입력</h2>
+                            <button
+                                type="button"
+                                className="admin-inline-secondary-button"
+                                onClick={handleClearAllTickerInputs}
+                            >
+                                모든 내용 삭제
+                            </button>
+                        </div>
                         <p className="admin-description">문장 하나를 입력한 뒤 Enter를 누르면 다음 줄에 회색 안내 토큰이 들어가고, 메인 페이지에서는 간격만 적용됩니다.</p>
                         <p className="admin-description admin-description-muted">
                             문장 사이 빈칸이 필요하면 빈 줄 대신 <span className="admin-inline-token">{TICKER_SPACE_TOKEN}</span> 를 입력해 주세요.
