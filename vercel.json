@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/business-inquiry.js": {
+      "maxDuration": 10
+    }
+  }
+}

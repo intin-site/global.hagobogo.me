@@ -1,0 +1,172 @@
+/* ============================================
+   hagobogo_csv — 누적 판매량 디스플레이 페이지
+   Figma 프레임(node-id: 3:3) 기반 구현 (3차)
+   ============================================ */
+
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@200;400;600&display=swap');
+
+/* --- 초기화 및 기본 설정 --- */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Barlow Condensed', sans-serif;
+    background-color: #bfc5cc;
+}
+
+/* --- 메인 컨테이너 --- */
+.hagobogo_csv {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* --- 배경 글로우 구체 (sphere) --- */
+.sphere {
+    position: absolute;
+    width: 840px;
+    height: 840px;
+    /* 화면 정중앙 배치 (Figma 좌표계 의도 반영) */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+    /* 부드러운 맥박 형태의 애니메이션 추가 */
+    animation: pulseGlow 5s ease-in-out infinite alternate;
+}
+
+.sphere img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+@keyframes pulseGlow {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.05);
+        opacity: 1;
+    }
+}
+
+/* --- 중앙 텍스트 컨텐츠 컨테이너 (conter) --- */
+.conter {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #bfc5cc;
+    /* 서서히 등장하는 페이드인 애니메이션 */
+    animation: fadeIn 1.2s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 큰 누적 판매량 숫자 */
+.sales-number {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 200;
+    /* ExtraLight */
+    font-size: 120px;
+    line-height: 1;
+    margin-bottom: 24px;
+    letter-spacing: -2px;
+}
+
+/* 부제목 텍스트 라인 */
+.sales-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 400;
+    /* Regular */
+    font-size: 32px;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.sales-title .brand {
+    font-weight: 600;
+    /* SemiBold */
+}
+
+/* 소제목 (Since 2025) */
+.sales-since {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 1.4;
+    opacity: 0.9;
+}
+
+
+/* --- 반응형 처리 --- */
+@media (max-width: 1024px) {
+    .sphere {
+        width: 600px;
+        height: 600px;
+    }
+
+    .sales-number {
+        font-size: 96px;
+    }
+
+    .sales-title {
+        font-size: 28px;
+    }
+
+    .sales-since {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sphere {
+        width: 400px;
+        height: 400px;
+    }
+
+    .sales-number {
+        font-size: 64px;
+    }
+
+    .sales-title {
+        font-size: 24px;
+        margin-bottom: 16px;
+    }
+
+    .sales-since {
+        font-size: 16px;
+    }
+}

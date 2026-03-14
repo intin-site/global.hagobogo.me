@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proposition Hagobogo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+  <style>
+    :root { --bg: #d1d6dc; --card-bg: rgba(255, 255, 255, 1.0); --text-primary: #4d545a; --text-secondary: #7d858d; --accent: #2BC4E5; --border: rgba(77, 84, 90, 0.15); --heading-font: 'Barlow Condensed', sans-serif; --body-font: 'Pretendard', sans-serif; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: var(--bg); }
+    body { max-width: 210mm; margin: 0 auto; padding: 12mm 14mm; font-family: var(--body-font); font-size: 10pt; line-height: 1.4; color: var(--text-primary); }
+    header { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-align: center; }
+    h1 { font-family: var(--heading-font); font-size: 22pt; font-weight: 500; color: var(--text-primary); letter-spacing: 0.5px; }
+    section { margin-bottom: 12px; }
+    h2 { font-family: var(--heading-font); font-size: 13pt; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.3px; }
+    h2 .accent { color: var(--text-primary); font-weight: 600; }
+    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 6px; }
+    .stat-card { background: var(--card-bg); border-radius: 12px; padding: 10px 8px; text-align: center; }
+    .stat-number { display: block; font-family: var(--heading-font); font-size: 30pt; font-weight: 400; color: #01B2CF; line-height: 1; margin-bottom: 4px; }
+    .stat-number .unit { font-size: 50%; font-weight: 400; margin-left: 2px; }
+    .stat-desc { display: block; font-size: 8pt; color: var(--text-secondary); line-height: 1.2; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 9pt; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255, 255, 255, 0.35); font-family: var(--heading-font); font-weight: 500; color: var(--text-primary); font-size: 10pt; }
+    tr:last-child td { border-bottom: none; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-2-item { background: rgba(255, 255, 255, 0.35); border-radius: 8px; padding: 8px 10px; }
+    .grid-2-item strong { font-family: var(--heading-font); font-size: 11pt; font-weight: 500; display: block; margin-bottom: 3px; color: var(--text-primary); }
+    .grid-2-item span { display: block; font-size: 9pt; color: var(--text-secondary); line-height: 1.2; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .benefit-box { background: rgba(255, 255, 255, 0.35); border-radius: 8px; padding: 8px; text-align: center; }
+    .benefit-title { font-family: var(--heading-font); font-weight: 600; font-size: 10pt; color: var(--text-primary); margin-bottom: 4px; }
+    .benefit-desc { font-size: 8.5pt; color: var(--text-secondary); line-height: 1.3; }
+    td:has(.stage-label) { background: rgba(255, 255, 255, 0.35); width: 140px; }
+    .stage-label { font-family: var(--heading-font); font-weight: 600; font-size: 10pt; white-space: nowrap; }
+    .problem-text { font-size: 10pt; line-height: 1.5; color: var(--text-secondary); }
+    .problem-text strong { color: var(--text-primary); font-weight: 600; }
+    footer { margin-top: 12px; padding-top: 8px; font-size: 8pt; color: var(--text-secondary); display: flex; justify-content: center; align-items: center; }
+    footer strong { color: var(--text-primary); font-family: var(--heading-font); font-weight: 500; }
+    footer a { color: var(--accent); text-decoration: none; }
+    .footer-actions { display: flex; align-items: center; justify-content: center; margin-top: 16px; }
+    .download-button { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 18px; border: none; border-radius: 999px; background: rgba(255, 255, 255, 0.85); color: var(--text-primary); font-family: var(--heading-font); font-size: 11pt; font-weight: 500; letter-spacing: 0.3px; text-decoration: none; transition: background-color 0.2s ease, color 0.2s ease; }
+    .download-button:hover { background: var(--text-primary); color: #ffffff; }
+    .note { font-style: italic; color: var(--text-secondary); font-size: 8pt; text-align: right; }
+    .footer-contact { display: none; }
+    .footer-actions .note { display: none; }
+    @media (max-width: 767px) {
+      body { max-width: none; padding: 20px 16px 24px; font-size: 9pt; }
+      header { margin-bottom: 12px; padding-bottom: 8px; }
+      h1 { font-size: 18pt; line-height: 1.1; }
+      h2 { font-size: 11pt; margin-bottom: 6px; }
+      section { margin-bottom: 10px; }
+      .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .stat-card { padding: 10px 6px; }
+      .stat-number { font-size: 24pt; }
+      .stat-desc { font-size: 7.4pt; }
+      table { font-size: 8.2pt; }
+      th, td { padding: 6px; overflow-wrap: anywhere; }
+      th { font-size: 9pt; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 6px; }
+      .grid-2-item, .benefit-box { padding: 8px; }
+      .grid-2-item strong, .benefit-title, .stage-label { font-size: 10pt; }
+      .grid-2-item span, .benefit-desc, .problem-text { font-size: 8.3pt; }
+      .footer-actions { margin-top: 12px; }
+      .download-button { width: 100%; min-height: 36px; font-size: 10pt; }
+    }
+    @media (max-width: 520px) {
+      body { padding: 18px 12px 20px; }
+      h1 { font-size: 16pt; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .stat-number { font-size: 22pt; }
+    }
+    @page { margin: 0; size: A4; }
+    @media print { body { background: white !important; } .download-button { display: none; } }
+  </style>
+</head>
+<body>
+  <header><h1>La moitié oubliée de la planification familiale</h1></header>
+  <section><div class="stat-grid"><div class="stat-card"><span class="stat-number">53<span class="unit">%</span></span><span class="stat-desc">Baisse du nombre de spermatozoïdes chez l'homme (40 ans)</span></div><div class="stat-card"><span class="stat-number">50<span class="unit">%</span></span><span class="stat-desc">Facteur d'infertilité masculine<br>(Part du produit : ?%)</span></div><div class="stat-card"><span class="stat-number">1.9<span class="unit">an</span></span><span class="stat-desc">Retard de consultation hospitalière chez l'homme</span></div><div class="stat-card"><span class="stat-number">60<span class="unit">%</span></span><span class="stat-desc">Améliorable grâce à une détection précoce</span></div><div class="stat-card"><span class="stat-number">7.8<span class="unit">%</span></span><span class="stat-desc">Moins de 25 ans déjà infertiles</span></div></div></section>
+  <section><h2><span class="accent">1.</span> Problème</h2><p class="problem-text">Les rayons de planification familiale en pharmacie sont dominés par les tests de grossesse et d'ovulation, et <strong>les produits destinés aux femmes représentent plus de 90 %</strong> de l'espace en rayon.</p></section>
+  <section><h2><span class="accent">2.</span> Solution — HAGOBOGO complète la catégorie</h2><table><tr><th>Intuitivité visuelle<br>(Voyez-le de vos propres yeux)</th><th>Données via application<br>(Gérez-le)</th><th>Certification mondiale<br>(Faites-lui confiance)</th></tr><tr><td>Au-delà d'un simple affichage d'état, les utilisateurs peuvent observer directement la mobilité des spermatozoïdes via leur smartphone, supprimant ainsi les barrières à l'entrée</td><td>L'application dédiée enregistre et suit les résultats, et fournit des conseils personnalisés pour une gestion continue</td><td>Qualité vérifiée grâce aux certifications Dispositif médical Classe 1 en Corée/Japon et IVDr Classe B dans l'UE (HAGOBOGO Pro)</td></tr></table></section>
+  <section><h2><span class="accent">3.</span> Succès mondial prouvé</h2><div class="grid-2"><div class="grid-2-item"><strong>🇰🇷 Corée (leader n°1 de la catégorie)</strong><span>100 000 unités vendues en 1 an, atteignant la 1re place de la catégorie (Disponible chez Olive Young, 7-Eleven, etc.)</span></div><div class="grid-2-item"><strong>🇯🇵 Japon (rang n°2)</strong><span>A atteint la 2e place de la catégorie et de la marque en 5 mois (Disponible chez Matsumoto Kiyoshi, Amazon Japan)</span></div><div class="grid-2-item"><strong>🌏 Expansion mondiale</strong><span>Expansion dans 10 pays en 6 mois, dont les États-Unis (Amazon n°3), le Canada, Singapour, etc.</span></div><div class="grid-2-item"><strong>📱 Succès du marketing viral</strong><span>Les campagnes coréennes sur les réseaux sociaux ont généré plus de 100 millions de vues cumulées à travers 200 vidéos (savoir-faire accumulé du succès)</span></div></div></section>
+  <section><h2><span class="accent">4.</span> Avantages du produit HAGOBOGO</h2><div class="grid-3"><div class="benefit-box"><div class="benefit-title">Jusqu'à +259 % de valeur moyenne par transaction</div><div class="benefit-desc">Lorsqu'il est associé à des produits féminins sous forme de « Couple Kit », la valeur moyenne par transaction peut atteindre 47 $ (HAGOBOGO) / 97 $ (HAGOBOGO Pro)</div></div><div class="benefit-box"><div class="benefit-title">Acquisition de nouveaux clients</div><div class="benefit-desc">60 % des acheteurs sont des femmes achetant pour leur partenaire, ce qui permet de capter de nouveaux segments de clientèle.</div></div><div class="benefit-box"><div class="benefit-title">Leadership de catégorie</div><div class="benefit-desc">Complétez la catégorie de planification familiale et assurez des points de différenciation avant vos concurrents.</div></div></div></section>
+  <section><h2><span class="accent">5.</span> Stratégie d'entrée sur le marché en 3 étapes</h2><table><tr><td><span class="stage-label">Étape 1</span><br>Développer la notoriété</td><td>Diffuser le message « Test simple à domicile avant la visite à l'hôpital » en s'appuyant sur une expertise éprouvée en marketing viral à 100 millions de vues</td></tr><tr><td><span class="stage-label">Étape 2</span><br>Conversion à l'achat</td><td>Augmenter la valeur des transactions hors ligne grâce à un placement en « zone dorée » à côté des produits féminins et à un merchandising en pack couple</td></tr><tr><td><span class="stage-label">Étape 3</span><br>Rachat / fidélisation</td><td>Encourager un nouveau test tous les 3 mois via les notifications push de l'application, et créer des sous-catégories grâce à des recommandations personnalisées de compléments</td></tr></table></section>
+  <footer><div class="footer-contact"><strong>INTIN Inc.</strong> | Grace Lee / Global Sales | Email: grace@intin.kr | Tel: +82-10-9242-8309 | Web: <a href="https://hagobogo.me/en">hagobogo.me/en</a></div><div class="footer-actions"><div class="note">* Clinical validation studies, original certificates, and case studies available upon request</div><a class="download-button" href="./Hagobogo_Proposal_fr_v01.pdf" download="Hagobogo_Proposal_fr_v01.pdf">Télécharger le PDF</a></div></footer>
+<script>
+  (function () {
+    const downloadButton = document.querySelector('.download-button');
+    if (!downloadButton) {
+      return;
+    }
+
+    const userAgent = navigator.userAgent || '';
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+      || window.matchMedia('(max-width: 767px)').matches;
+
+    if (!isMobileDevice) {
+      return;
+    }
+
+    const pdfUrl = downloadButton.getAttribute('href');
+
+    downloadButton.textContent = 'Voir le PDF';
+    downloadButton.removeAttribute('download');
+    downloadButton.setAttribute('target', '_blank');
+    downloadButton.setAttribute('rel', 'noopener noreferrer');
+    downloadButton.addEventListener('click', function (event) {
+      event.preventDefault();
+
+      if (!pdfUrl) {
+        return;
+      }
+
+      const openedWindow = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      if (openedWindow) {
+        return;
+      }
+
+      window.location.href = pdfUrl;
+    });
+  }());
+</script>
+</body>
+</html>

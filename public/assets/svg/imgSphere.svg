@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 840 840" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="sphere">
+<circle id="sphere_skin" opacity="0.3" cx="420" cy="420" r="420" fill="var(--fill-0, white)"/>
+<g id="sphere_egg" filter="url(#filter0_f_4_90)">
+<circle cx="420" cy="420" r="380" fill="var(--fill-0, white)"/>
+</g>
+<path id="sphere_center" d="M419.933 393V446.865M393 419.933H446.865" stroke="var(--stroke-0, white)" stroke-opacity="0.25" stroke-width="2"/>
+</g>
+<defs>
+<filter id="filter0_f_4_90" x="24" y="24" width="792" height="792" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur_4_90"/>
+</filter>
+</defs>
+</svg>
