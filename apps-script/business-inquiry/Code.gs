@@ -1,3 +1,4 @@
+// 비즈니스 문의 저장, 관리자 설정 조회/저장, 알림 메일 발송에 공통으로 쓰는 기본 설정값입니다.
 const SHEET_NAME = 'Business Inquiries List';
 const MAX_INQUIRY_LENGTH = 3000;
 const SCRIPT_TIME_ZONE = 'Asia/Seoul';
@@ -13,10 +14,12 @@ const DEFAULT_DOT_BLUE_RANGE = {
   max: 1440
 };
 const SUPPORTED_LANGUAGES = ['EN', 'FR', 'ES', 'KR'];
+const BUSINESS_INQUIRIES_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_ubB52DuzvOOfW3RQ6vuoKrwG6oAozwldMOyshWPePw/edit?gid=0#gid=0';
 const STATUS_HEADER_NAME = 'Status';
 const DUPLICATE_SUBMISSION_WINDOW_SECONDS = 120;
 
 function doGet() {
+  // 웹앱이 살아 있는지 간단히 확인할 수 있는 상태 확인 응답입니다.
   return ContentService
     .createTextOutput(JSON.stringify({
       ok: true,
@@ -35,6 +38,7 @@ function doPost(e) {
       });
     }
 
+    // 프런트에서 보낸 JSON 본문을 해석해 관리자 요청인지 일반 문의인지 먼저 구분합니다.
     const payload = JSON.parse(e.postData.contents);
     const adminActionResponse = handleAdminAction(payload);
 
@@ -42,6 +46,7 @@ function doPost(e) {
       return createJsonResponse(adminActionResponse);
     }
 
+    // 일반 문의 요청은 입력값 검증과 짧은 시간 내 중복 접수 여부를 먼저 검사합니다.
     const validationError = validatePayload(payload);
     const spamError = checkSpamRisk(payload);
 
@@ -53,6 +58,7 @@ function doPost(e) {
       return createJsonResponse(spamError);
     }
 
+    // 검증을 통과한 문의는 지정한 시트에 행 단위로 저장합니다.
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName(SHEET_NAME);
     const submittedAt = parseSubmittedAt(payload.submittedAt);
@@ -79,6 +85,7 @@ function doPost(e) {
       payload.inquiry.trim()
     ]);
 
+    // 저장 직후 관리자 알림 메일을 보내고, 결과를 Status 열에 함께 남깁니다.
     const savedRowIndex = sheet.getLastRow();
     const mailResult = sendNotificationEmail(payload, submittedAt);
 
@@ -109,6 +116,7 @@ function handleAdminAction(payload) {
     return null;
   }
 
+  // 공개 설정 조회는 로그인 없이 메인 페이지가 읽을 수 있도록 별도 허용합니다.
   if (payload.action === 'GET_PUBLIC_SITE_SETTINGS') {
     return {
       ok: true,
@@ -117,6 +125,7 @@ function handleAdminAction(payload) {
     };
   }
 
+  // 그 외 관리자 요청은 모두 Script Properties의 관리자 비밀번호 검증을 통과해야 합니다.
   if (!isValidAdminPassword(payload.adminPassword)) {
     return {
       ok: false,
@@ -125,6 +134,7 @@ function handleAdminAction(payload) {
     };
   }
 
+  // 관리자 로그인 화면에서 비밀번호만 검증할 때 쓰는 응답입니다.
   if (payload.action === 'AUTHENTICATE_ADMIN') {
     return {
       ok: true,
@@ -133,6 +143,7 @@ function handleAdminAction(payload) {
     };
   }
 
+  // 관리자 페이지 진입 직후 전체 사이트 설정을 한 번에 불러옵니다.
   if (payload.action === 'GET_ADMIN_SETTINGS') {
     return {
       ok: true,
@@ -141,6 +152,7 @@ function handleAdminAction(payload) {
     };
   }
 
+  // 관리자 페이지에서 수정한 사이트 공용 설정을 한 번에 저장합니다.
   if (payload.action === 'SAVE_ADMIN_SETTINGS') {
     const validationError = validateSiteSettings(payload.siteSettings);
 
@@ -180,30 +192,54 @@ function sendNotificationEmail(payload, submittedAt) {
 
   const subject = `[HAGOBOGO] New Business Inquiry from ${payload.companyName}`;
   const formattedDate = Utilities.formatDate(submittedAt, SCRIPT_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
-  
-  const body = `
-    새로운 비즈니스 문의가 접수되었습니다.
-    
-    [접수 일시] ${formattedDate}
-    [이름] ${payload.name}
-    [직함] ${payload.title || 'N/A'}
-    [국가] ${payload.country}
-    [회사명] ${payload.companyName}
-    [이메일] ${payload.email}
-    
-    [문의 내용]
-    ${payload.inquiry}
-    
-    ---
-    본 메일은 HAGOBOGO Business Inquiries 시스템에서 자동 발송되었습니다.
-    구글 시트에서 상세 내용을 확인하세요.
+  // 링크를 지원하지 않는 메일 환경도 고려해 평문 본문을 함께 유지합니다.
+  const body = [
+    '새로운 비즈니스 문의가 접수되었습니다.',
+    '',
+    `[접수 일시] ${formattedDate}`,
+    `[이름] ${payload.name}`,
+    `[직함] ${payload.title || 'N/A'}`,
+    `[국가] ${payload.country}`,
+    `[회사명] ${payload.companyName}`,
+    `[이메일] ${payload.email}`,
+    '',
+    '[문의 내용]',
+    payload.inquiry,
+    '',
+    '---',
+    '본 메일은 HAGOBOGO Business Inquiries 시스템에서 자동 발송되었습니다.',
+    `구글 시트에서 상세 내용을 확인하세요: ${BUSINESS_INQUIRIES_SHEET_URL}`
+  ].join('\n');
+  // 일반 메일 클라이언트에서는 HTML 본문을 보여주므로 구글 시트 바로가기 링크를 함께 넣습니다.
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.7; color: #333333;">
+      <p>새로운 비즈니스 문의가 접수되었습니다.</p>
+      <p>
+        [접수 일시] <span style="color: #4a86e8;">${escapeHtml(formattedDate)}</span><br />
+        [이름] ${escapeHtml(payload.name)}<br />
+        [직함] ${escapeHtml(payload.title || 'N/A')}<br />
+        [국가] ${escapeHtml(payload.country)}<br />
+        [회사명] ${escapeHtml(payload.companyName)}<br />
+        [이메일] ${escapeHtml(payload.email)}
+      </p>
+      <p>[문의 내용]</p>
+      <p>${escapeHtml(payload.inquiry).replace(/\n/g, '<br />')}</p>
+      <p>---</p>
+      <p>
+        본 메일은
+        <a href="${BUSINESS_INQUIRIES_SHEET_URL}" target="_blank" rel="noreferrer">HAGOBOGO Business Inquiries</a>
+        시스템에서 자동 발송되었습니다.<br />
+        구글 시트에서 상세 내용을 확인하세요.
+      </p>
+    </div>
   `;
 
   try {
     MailApp.sendEmail({
       to: notificationEmail,
       subject: subject,
-      body: body
+      body: body,
+      htmlBody: htmlBody
     });
 
     return {
@@ -221,12 +257,14 @@ function sendNotificationEmail(payload, submittedAt) {
 }
 
 function getNotificationEmail() {
+  // 문의 알림을 받을 메일 주소는 Script Properties에서 읽습니다.
   return PropertiesService
     .getScriptProperties()
     .getProperty(NOTIFICATION_EMAIL_PROPERTY_KEY);
 }
 
 function getSiteSettings() {
+  // 메인 페이지와 관리자 페이지가 함께 쓰는 공용 설정 묶음을 구성합니다.
   return {
     notificationEmail: getNotificationEmail() || '',
     salesCount: getSalesCount(),
@@ -236,6 +274,7 @@ function getSiteSettings() {
 }
 
 function saveSiteSettings(siteSettings) {
+  // 관리자 화면에서 저장한 값을 Script Properties에 표준 형식으로 기록합니다.
   const nextSettings = normalizeSiteSettings(siteSettings);
   const scriptProperties = PropertiesService.getScriptProperties();
 
@@ -248,6 +287,7 @@ function saveSiteSettings(siteSettings) {
 }
 
 function getAdminPassword() {
+  // 관리자 비밀번호를 Script Properties에서 읽고, 없으면 기본값으로 동작합니다.
   return PropertiesService
     .getScriptProperties()
     .getProperty(ADMIN_PASSWORD_PROPERTY_KEY) || DEFAULT_ADMIN_PASSWORD;
@@ -262,7 +302,18 @@ function isValidEmail(value) {
   return typeof value === 'string' && emailPattern.test(value.trim());
 }
 
+function escapeHtml(value) {
+  // HTML 메일 본문에 사용자 입력값이 그대로 들어갈 때 마크업 깨짐을 막습니다.
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getSalesCount() {
+  // 판매 카운터 기준값은 숫자로 읽고, 이상한 값이면 기본값으로 되돌립니다.
   const rawValue = PropertiesService
     .getScriptProperties()
     .getProperty(SALES_COUNT_PROPERTY_KEY);
@@ -276,6 +327,7 @@ function getSalesCount() {
 }
 
 function getDotBlueSpawnFrequencyRange() {
+  // Dot_blue 발생 빈도는 JSON 문자열로 저장해 두었다가 범위 객체로 복원합니다.
   const rawValue = PropertiesService
     .getScriptProperties()
     .getProperty(DOT_BLUE_RANGE_PROPERTY_KEY);
@@ -293,6 +345,7 @@ function getDotBlueSpawnFrequencyRange() {
 }
 
 function getTickerItemsByLanguage() {
+  // 뉴스 ticker는 언어별 배열 묶음으로 저장되어 메인 페이지에서 그대로 사용됩니다.
   const rawValue = PropertiesService
     .getScriptProperties()
     .getProperty(TICKER_ITEMS_PROPERTY_KEY);
@@ -310,6 +363,7 @@ function getTickerItemsByLanguage() {
 }
 
 function createEmptyTickerItemsByLanguageMap() {
+  // 언어별 데이터가 없을 때도 화면 로직이 깨지지 않도록 빈 구조를 먼저 만듭니다.
   const itemsByLanguage = {};
 
   for (let index = 0; index < SUPPORTED_LANGUAGES.length; index += 1) {
@@ -320,6 +374,7 @@ function createEmptyTickerItemsByLanguageMap() {
 }
 
 function normalizeTickerItemsByLanguageMap(value) {
+  // Script Properties에서 읽은 ticker 데이터를 언어별 문자열 배열만 남기도록 정리합니다.
   const nextItemsByLanguage = createEmptyTickerItemsByLanguageMap();
 
   if (!value || typeof value !== 'object') {
@@ -343,6 +398,7 @@ function normalizeTickerItemsByLanguageMap(value) {
 }
 
 function normalizeDotBlueSpawnFrequencyRange(value) {
+  // 최소/최대 값 순서가 바뀌어 들어와도 저장 전에 정상 범위로 보정합니다.
   const min = Number(value && value.min);
   const max = Number(value && value.max);
 
@@ -357,6 +413,7 @@ function normalizeDotBlueSpawnFrequencyRange(value) {
 }
 
 function normalizeSiteSettings(siteSettings) {
+  // 관리자 화면에서 전달한 전체 설정을 저장 가능한 공통 형식으로 맞춥니다.
   const notificationEmail = isValidEmail(siteSettings && siteSettings.notificationEmail)
     ? siteSettings.notificationEmail.trim()
     : '';
@@ -371,6 +428,7 @@ function normalizeSiteSettings(siteSettings) {
 }
 
 function validateSiteSettings(siteSettings) {
+  // 관리자 설정 저장 전에 필수 형식이 맞는지 한 번 더 점검합니다.
   if (!siteSettings || typeof siteSettings !== 'object') {
     return {
       ok: false,
@@ -411,6 +469,7 @@ function validateSiteSettings(siteSettings) {
 }
 
 function getStatusColumnIndex(sheet) {
+  // 상태 기록 열이 없으면 자동으로 새로 만들어 메일 발송 결과를 남길 수 있게 합니다.
   const lastColumn = Math.max(sheet.getLastColumn(), 1);
   const headerValues = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
 
@@ -431,6 +490,7 @@ function updateStatusCell(sheet, rowIndex, columnIndex, statusText) {
 }
 
 function checkSpamRisk(payload) {
+  // 같은 이메일이 너무 짧은 시간 안에 반복 접수되면 임시로 차단합니다.
   const email = payload && payload.email ? payload.email.trim().toLowerCase() : '';
 
   if (!email) {
@@ -453,6 +513,7 @@ function checkSpamRisk(payload) {
 }
 
 function markSubmissionCache(payload) {
+  // 방금 접수된 이메일을 캐시에 기록해 중복 접수를 잠시 막습니다.
   const email = payload && payload.email ? payload.email.trim().toLowerCase() : '';
 
   if (!email) {
@@ -473,6 +534,7 @@ function truncateStatusMessage(message) {
 }
 
 function validatePayload(payload) {
+  // 일반 비즈니스 문의 본문에서 실제 저장에 필요한 필수 항목을 확인합니다.
   if (!payload || typeof payload !== 'object') {
     return {
       ok: false,
@@ -545,6 +607,7 @@ function isNonEmptyString(value) {
 }
 
 function parseSubmittedAt(value) {
+  // 프런트에서 전달한 접수 시각이 비어 있거나 잘못되면 서버 현재 시각으로 대체합니다.
   if (!value) {
     return new Date();
   }
@@ -567,6 +630,7 @@ function formatTimeCell(date) {
 }
 
 function createJsonResponse(payload) {
+  // Apps Script 웹앱 응답을 프런트에서 읽기 쉬운 JSON 문자열로 통일합니다.
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);

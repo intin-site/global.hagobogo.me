@@ -3,6 +3,15 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 10:34 - Apps Script 문의 처리 코드 한글 주석 보강
+- `apps-script/business-inquiry/Code.gs`의 주요 상수와 핵심 함수 위주로 기능 설명용 한글 주석을 추가
+- 문의 저장, 관리자 설정 조회/저장, 중복 접수 방지, 메일 발송, 공개 설정 조회 흐름을 초보자도 읽기 쉽게 정리
+
+## 2026-03-14 10:33 - 문의 알림 메일 하단 구글 시트 링크 추가
+- `apps-script/business-inquiry/Code.gs`의 문의 알림 메일을 HTML 본문까지 함께 보내도록 변경
+- 메일 하단 `HAGOBOGO Business Inquiries` 문구에 지정한 Google Sheets 링크를 삽입해 메일에서 바로 시트로 이동할 수 있게 정리
+- 평문 본문도 함께 유지해 링크를 지원하지 않는 메일 클라이언트에서도 시트 주소를 확인할 수 있도록 보완
+
 ## 2026-03-14 10:17 - intin 원격 저장소 이력 정리 후 강제 업로드
 - `intin/main`의 오늘 작업 이전 커밋 이력을 제거하고, 현재 작업 상태만 담은 단일 루트 커밋 `828cefc`를 새로 생성
 - 기존 `intin/main` 이력은 로컬 백업 브랜치 `backup/intin-main`으로 남겨 두고, 원격 `https://github.com/intin-site/global.hagobogo.me.git` 에 `--force`로 업로드 완료
