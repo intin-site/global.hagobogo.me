@@ -120,7 +120,8 @@ export default function AdminPage() {
             ES: [...normalizedSettings.tickerItemsByLanguage.ES],
             KR: [...normalizedSettings.tickerItemsByLanguage.KR],
         });
-        setSalesInput(formatNumericInput(normalizedSettings.salesCount));
+        // 관리자 입력창에는 현재 공식 누적값을 보여 줘서 실시간 증가분까지 함께 보정할 수 있게 합니다.
+        setSalesInput(formatNumericInput(normalizedSettings.currentSalesCount));
         setDotBlueFrequencyMinInput(formatNumericInput(normalizedSettings.dotBlueSpawnFrequencyRange.min));
         setDotBlueFrequencyMaxInput(formatNumericInput(normalizedSettings.dotBlueSpawnFrequencyRange.max));
         setNotificationEmailInput(normalizedSettings.notificationEmail);

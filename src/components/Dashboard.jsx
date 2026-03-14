@@ -16,10 +16,12 @@ import {
     DEFAULT_SALES_COUNT,
     normalizeAdminSiteSettings,
 } from '../utils/adminSettings';
-import { fetchPublicSiteSettings } from '../lib/adminApi';
+import { fetchPublicSiteSettings, incrementPublicSalesCount } from '../lib/adminApi';
 
 const LANGUAGE_STORAGE_KEY = 'site_language';
 const PROPOSAL_HEIGHT_MESSAGE_TYPE = 'HAGOBOGO_PROPOSAL_HEIGHT';
+const SALES_SYNC_DEBOUNCE_MS = 2500;
+const SALES_SYNC_BATCH_SIZE = 10;
 const PROPOSAL_FILE_BY_LANGUAGE = {
     EN: 'Hagobogo_Proposal_en_v01.html',
     ES: 'Hagobogo_Proposal_es_v01.html',
@@ -50,8 +52,8 @@ export default function Dashboard() {
     const publicSettingsFocusThrottleMs = 15000;
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
-    const [baseSales, setBaseSales] = useState(DEFAULT_SALES_COUNT);
-    const [localHits, setLocalHits] = useState(0);
+    const [syncedSales, setSyncedSales] = useState(DEFAULT_SALES_COUNT);
+    const [pendingSalesHits, setPendingSalesHits] = useState(0);
     const [isSalesVisible, setIsSalesVisible] = useState(false);
     const [language, setLanguage] = useState(() => {
         if (typeof window === 'undefined') {
@@ -83,9 +85,12 @@ export default function Dashboard() {
     const pulseTimeoutRef = useRef(null);
     const lineTimeoutRef = useRef(null);
     const salesRevealTimeoutRef = useRef(null);
+    const salesSyncTimeoutRef = useRef(null);
     const publicSettingsPollingIntervalRef = useRef(null);
     const isFetchingPublicSiteSettingsRef = useRef(false);
+    const isSyncingSalesRef = useRef(false);
     const lastPublicSiteSettingsRequestAtRef = useRef(0);
+    const pendingSalesHitsRef = useRef(0);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
     const proposalIframeRef = useRef(null);
@@ -95,7 +100,7 @@ export default function Dashboard() {
     const proposalFileName = PROPOSAL_FILE_BY_LANGUAGE[language] || PROPOSAL_FILE_BY_LANGUAGE.EN;
     const tickerItems = siteSettings.tickerItemsByLanguage[language] || [];
     const visibleTickerItems = tickerItems;
-    const displayedSales = baseSales + localHits;
+    const displayedSales = syncedSales + pendingSalesHits;
 
     const loadPublicSiteSettings = useCallback(async ({ revealSales = false } = {}) => {
         if (isFetchingPublicSiteSettingsRef.current) {
@@ -111,19 +116,20 @@ export default function Dashboard() {
 
             setSiteSettings((previousSettings) => {
                 const hasSameSalesCount = previousSettings.salesCount === normalizedSettings.salesCount;
+                const hasSameSalesIncrement = previousSettings.salesIncrement === normalizedSettings.salesIncrement;
                 const hasSameDotBlueRange = (
                     previousSettings.dotBlueSpawnFrequencyRange.min === normalizedSettings.dotBlueSpawnFrequencyRange.min
                     && previousSettings.dotBlueSpawnFrequencyRange.max === normalizedSettings.dotBlueSpawnFrequencyRange.max
                 );
                 const hasSameTickerItems = JSON.stringify(previousSettings.tickerItemsByLanguage) === JSON.stringify(normalizedSettings.tickerItemsByLanguage);
 
-                if (hasSameSalesCount && hasSameDotBlueRange && hasSameTickerItems) {
+                if (hasSameSalesCount && hasSameSalesIncrement && hasSameDotBlueRange && hasSameTickerItems) {
                     return previousSettings;
                 }
 
                 return normalizedSettings;
             });
-            setBaseSales(normalizedSettings.salesCount);
+            setSyncedSales(normalizedSettings.currentSalesCount);
 
             if (revealSales) {
                 if (salesRevealTimeoutRef.current) {
@@ -144,6 +150,43 @@ export default function Dashboard() {
             }
         } finally {
             isFetchingPublicSiteSettingsRef.current = false;
+        }
+    }, []);
+
+    const flushPendingSalesHits = useCallback(async () => {
+        if (isSyncingSalesRef.current || pendingSalesHitsRef.current <= 0) {
+            return;
+        }
+
+        const incrementBy = pendingSalesHitsRef.current;
+
+        isSyncingSalesRef.current = true;
+
+        try {
+            const normalizedSettings = await incrementPublicSalesCount(incrementBy);
+
+            setSiteSettings((previousSettings) => {
+                const hasSameSalesCount = previousSettings.salesCount === normalizedSettings.salesCount;
+                const hasSameSalesIncrement = previousSettings.salesIncrement === normalizedSettings.salesIncrement;
+                const hasSameDotBlueRange = (
+                    previousSettings.dotBlueSpawnFrequencyRange.min === normalizedSettings.dotBlueSpawnFrequencyRange.min
+                    && previousSettings.dotBlueSpawnFrequencyRange.max === normalizedSettings.dotBlueSpawnFrequencyRange.max
+                );
+                const hasSameTickerItems = JSON.stringify(previousSettings.tickerItemsByLanguage) === JSON.stringify(normalizedSettings.tickerItemsByLanguage);
+
+                if (hasSameSalesCount && hasSameSalesIncrement && hasSameDotBlueRange && hasSameTickerItems) {
+                    return previousSettings;
+                }
+
+                return normalizedSettings;
+            });
+            setSyncedSales(normalizedSettings.currentSalesCount);
+            pendingSalesHitsRef.current = Math.max(0, pendingSalesHitsRef.current - incrementBy);
+            setPendingSalesHits((previousValue) => Math.max(0, previousValue - incrementBy));
+        } catch (error) {
+            console.error('판매 카운트 증가분을 저장하지 못했습니다.', error);
+        } finally {
+            isSyncingSalesRef.current = false;
         }
     }, []);
 
@@ -174,6 +217,10 @@ export default function Dashboard() {
                 window.clearTimeout(salesRevealTimeoutRef.current);
             }
 
+            if (salesSyncTimeoutRef.current) {
+                window.clearTimeout(salesSyncTimeoutRef.current);
+            }
+
             if (publicSettingsPollingIntervalRef.current) {
                 window.clearInterval(publicSettingsPollingIntervalRef.current);
             }
@@ -181,6 +228,46 @@ export default function Dashboard() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [loadPublicSiteSettings, publicSettingsFocusThrottleMs, publicSettingsPollingIntervalMs]);
+
+    useEffect(() => {
+        if (pendingSalesHits <= 0) {
+            if (salesSyncTimeoutRef.current) {
+                window.clearTimeout(salesSyncTimeoutRef.current);
+                salesSyncTimeoutRef.current = null;
+            }
+
+            return undefined;
+        }
+
+        if (salesSyncTimeoutRef.current) {
+            window.clearTimeout(salesSyncTimeoutRef.current);
+        }
+
+        salesSyncTimeoutRef.current = window.setTimeout(() => {
+            flushPendingSalesHits();
+        }, SALES_SYNC_DEBOUNCE_MS);
+
+        return () => {
+            if (salesSyncTimeoutRef.current) {
+                window.clearTimeout(salesSyncTimeoutRef.current);
+                salesSyncTimeoutRef.current = null;
+            }
+        };
+    }, [flushPendingSalesHits, pendingSalesHits]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && pendingSalesHitsRef.current > 0) {
+                flushPendingSalesHits();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [flushPendingSalesHits]);
 
     useEffect(() => {
         return () => {
@@ -278,7 +365,8 @@ export default function Dashboard() {
     }, []);
 
     const handleHit = useCallback(() => {
-        setLocalHits((prev) => prev + 1);
+        pendingSalesHitsRef.current += 1;
+        setPendingSalesHits((prev) => prev + 1);
         setIsPulsing(false);
         setIsLineHit(false);
         if (pulseTimeoutRef.current) {
@@ -295,7 +383,10 @@ export default function Dashboard() {
         lineTimeoutRef.current = setTimeout(() => {
             setIsLineHit(false);
         }, 500);
-    }, []);
+        if (pendingSalesHitsRef.current >= SALES_SYNC_BATCH_SIZE) {
+            flushPendingSalesHits();
+        }
+    }, [flushPendingSalesHits]);
 
     const handleCloseInquiryModal = useCallback(() => {
         setIsInquiryModalOpen(false);

@@ -124,3 +124,12 @@ export async function fetchPublicSiteSettings() {
 
     return normalizeAdminSiteSettings(data.siteSettings);
 }
+
+export async function incrementPublicSalesCount(incrementBy) {
+    const data = await postAdminRequest({
+        action: 'INCREMENT_PUBLIC_SALES_COUNT',
+        incrementBy,
+    });
+
+    return normalizeAdminSiteSettings(data.siteSettings);
+}
