@@ -59,9 +59,9 @@ export const TRANSLATIONS = {
             },
         },
         ticker: [
-            "Service Advancement: Intin's 'HAGOBOGO' app has significantly enhanced digital healthcare accessibility by introducing its 2.0 update, featuring user-engaging contents such as a sperm encyclopedia and quiz games.",
-            "Growing Market Demand: As interest in male infertility prevention and self-health management rises, the 'HAGOBOGO' self-testing kit is gaining significant attention as an essential health appliance for newlyweds and single-person households.",
-            "Global Expansion: Building on its domestic success, 'HAGOBOGO' is expanding its presence as a mobile-based reproductive health monitoring solution by launching a global dedicated app for international users.",
+            "[Global Expansion] K-Smart Home Healthcare 'HAGOBOGO' launches full-scale overseas expansion, building on its success in the Korean, Japanese, and U.S. markets.",
+            "[Distribution Network Expansion] Launch of the 'Fuwellness Edition' (General Consumer Goods), completely breaking down medical device regulatory barriers; expanding sales to online and offline retail channels worldwide.",
+            "[Business Profitability] Transforming the female-focused family planning category into couple and male wellness; driving AOV growth through strategic bundling and cross-selling with supplements and healthcare products.",
         ],
         footer: [
             'ⓒ 2026 INTIN Inc. All rights reserved.',
@@ -127,9 +127,9 @@ export const TRANSLATIONS = {
             },
         },
         ticker: [
-            "Avance del servicio: La aplicación 'HAGOBOGO' de Intin ha mejorado significativamente la accesibilidad de la salud digital con su actualización 2.0, incorporando contenidos atractivos como una enciclopedia del esperma y juegos de preguntas.",
-            "Crecimiento de la demanda del mercado: A medida que aumenta el interés por la prevención de la infertilidad masculina y el autocuidado, el kit de autoevaluación 'HAGOBOGO' está ganando gran atención como dispositivo de salud esencial para recién casados y hogares unipersonales.",
-            "Expansión global: Basándose en su éxito nacional, 'HAGOBOGO' amplía su presencia como solución móvil de monitoreo de la salud reproductiva mediante el lanzamiento de una aplicación global dedicada para usuarios internacionales.",
+            "[Expansión Global] La solución K-Smart Home Healthcare 'HAGOBOGO' lanza una expansión internacional a gran escala, basada en su éxito en los mercados de Corea, Japón y Estados Unidos.",
+            "[Ampliación de la Red de Distribución] Lanzamiento de la edición 'Fuwellness' (productos de consumo masivo), superando por completo las barreras regulatorias de los dispositivos médicos; ampliación de las ventas a canales minoristas online y offline en todo el mundo.",
+            "[Rentabilidad del Negocio] Innovación de la categoría de planificación familiar (antes centrada en la mujer) hacia el bienestar de parejas y hombres; incremento del valor medio del pedido (AOV) mediante bundling y cross-selling con suplementos y productos de salud.",
         ],
         footer: [
             'ⓒ 2026 INTIN Inc. Todos los derechos reservados.',
@@ -195,9 +195,9 @@ export const TRANSLATIONS = {
             },
         },
         ticker: [
-            "Avancée du service : l'application 'HAGOBOGO' d'Intin a considérablement amélioré l'accessibilité aux soins de santé numériques grâce à sa mise à jour 2.0, avec des contenus engageants tels qu'une encyclopédie du sperme et des quiz.",
-            "Croissance de la demande du marché : avec l'intérêt croissant pour la prévention de l'infertilité masculine et l'autogestion de la santé, le kit d'auto-test 'HAGOBOGO' attire fortement l'attention comme appareil de santé essentiel pour les jeunes mariés et les foyers d'une seule personne.",
-            "Expansion mondiale : fort de son succès national, 'HAGOBOGO' étend sa présence comme solution mobile de suivi de la santé reproductive en lançant une application mondiale dédiée aux utilisateurs internationaux.",
+            "[Expansion Mondiale] La solution K-Smart Home Healthcare « HAGOBOGO » lance un déploiement international à grande échelle, s'appuyant sur son succès sur les marchés coréen, japonais et américain.",
+            "[Élargissement du Réseau de Distribution] Lancement de l'édition « Fuwellness » (produits de grande consommation), éliminant totalement les barrières réglementaires des dispositifs médicaux ; extension des ventes aux canaux de distribution en ligne et hors ligne dans le monde entier.",
+            "[Rentabilité Commerciale] Transformation de la catégorie planification familiale (initialement féminine) vers le bien-être des couples et des hommes ; augmentation du panier moyen grâce à des bundles et du cross-selling avec des compléments alimentaires et des produits de santé.",
         ],
         footer: [
             'ⓒ 2026 INTIN Inc. Tous droits réservés.',
@@ -263,9 +263,9 @@ export const TRANSLATIONS = {
             },
         },
         ticker: [
-            "서비스 고도화: 인틴의 'HAGOBOGO' 앱은 정자 백과사전과 퀴즈 게임 같은 참여형 콘텐츠를 포함한 2.0 업데이트를 통해 디지털 헬스케어 접근성을 크게 향상시켰습니다.",
-            "시장 수요 확대: 남성 난임 예방과 자기 건강 관리에 대한 관심이 높아지면서 'HAGOBOGO' 자가 테스트 키트는 신혼부부와 1인 가구의 필수 헬스 가전으로 주목받고 있습니다.",
-            "글로벌 확장: 국내 성공을 기반으로 'HAGOBOGO'는 해외 사용자를 위한 전용 글로벌 앱을 출시하며 모바일 기반 생식 건강 모니터링 솔루션으로서 입지를 넓히고 있습니다.",
+            "[글로벌 진출] K-스마트 홈 헬스케어 'HAGOBOGO', 한국·일본·미국 시장 성공을 발판으로 본격적인 해외진출",
+            "[유통망 확대] 의료기기 규제 장벽을 완전히 깬 '퓨웰니스 에디션(일반 공산품)' 출시, 전 세계 온·오프라인 리테일 채널로 판매 영역 확장",
+            "[비즈니스 수익성] 여성 위주의 가족계획 카테고리를 커플·남성 웰니스로 혁신, 영양제 및 헬스케어 제품과의 '번들 기획(Cross-selling)'으로 객단가 상승 견인",
         ],
         footer: [
             'ⓒ 2026 INTIN Inc. 모든 권리 보유.',
