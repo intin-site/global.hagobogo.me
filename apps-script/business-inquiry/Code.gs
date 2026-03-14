@@ -19,6 +19,7 @@ const BUSINESS_INQUIRIES_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_u
 const STATUS_HEADER_NAME = 'Status';
 const DUPLICATE_SUBMISSION_WINDOW_SECONDS = 120;
 const SCRIPT_LOCK_WAIT_TIMEOUT_MS = 10000;
+const SHEET_TEXT_NUMBER_FORMAT = '@STRING@';
 
 function doGet() {
   // 웹앱이 살아 있는지 간단히 확인할 수 있는 상태 확인 응답입니다.
@@ -75,9 +76,7 @@ function doPost(e) {
 
     const savedRowIndex = runWithScriptLock(function() {
       const statusColumnIndex = getStatusColumnIndex(sheet);
-
-      // 시트에 데이터 추가와 행 번호 확인을 같은 잠금 구간에서 처리해 동시 접수 시 순서가 섞이지 않게 합니다.
-      sheet.appendRow([
+      const inquiryRowValues = [[
         formatDateCell(submittedAt),
         formatTimeCell(submittedAt),
         sanitizeSheetCellValue(payload.name),
@@ -86,10 +85,16 @@ function doPost(e) {
         sanitizeSheetCellValue(payload.companyName),
         sanitizeSheetCellValue(payload.email),
         sanitizeSheetCellValue(payload.inquiry)
-      ]);
+      ]];
+      const nextRowIndex = sheet.getLastRow() + 1;
+      const inquiryRange = sheet.getRange(nextRowIndex, 1, 1, inquiryRowValues[0].length);
+
+      // 수식 인젝션을 막기 위해 저장 전에 대상 셀 전체를 텍스트 형식으로 고정한 뒤 값을 씁니다.
+      inquiryRange.setNumberFormat(SHEET_TEXT_NUMBER_FORMAT);
+      inquiryRange.setValues(inquiryRowValues);
 
       return {
-        rowIndex: sheet.getLastRow(),
+        rowIndex: nextRowIndex,
         statusColumnIndex: statusColumnIndex
       };
     });
