@@ -465,7 +465,7 @@ function getLastSalesTickAt() {
     return storedValue;
   }
 
-  return new Date().toISOString();
+  return '';
 }
 
 function isValidIsoDateString(value) {
@@ -502,7 +502,8 @@ function calculateSalesAutoGrowth(currentSalesCount, lastSalesTickAt, dotBlueSpa
       nextCurrentSalesCount: currentSalesCount,
       nextLastSalesTickAt: nowDate.toISOString(),
       nextSalesUpdatedAt: getSalesUpdatedAt(),
-      incrementCount: 0
+      incrementCount: 0,
+      shouldPersistTickAt: true
     };
   }
 
@@ -515,7 +516,8 @@ function calculateSalesAutoGrowth(currentSalesCount, lastSalesTickAt, dotBlueSpa
       nextCurrentSalesCount: currentSalesCount,
       nextLastSalesTickAt: lastSalesTickAt,
       nextSalesUpdatedAt: getSalesUpdatedAt(),
-      incrementCount: 0
+      incrementCount: 0,
+      shouldPersistTickAt: false
     };
   }
 
@@ -525,7 +527,8 @@ function calculateSalesAutoGrowth(currentSalesCount, lastSalesTickAt, dotBlueSpa
     nextCurrentSalesCount: currentSalesCount + incrementCount,
     nextLastSalesTickAt: new Date(Math.floor(nextLastSalesTickAtMs)).toISOString(),
     nextSalesUpdatedAt: nowDate.toISOString(),
-    incrementCount: incrementCount
+    incrementCount: incrementCount,
+    shouldPersistTickAt: true
   };
 }
 
@@ -540,11 +543,13 @@ function applySalesAutoGrowthAndGetSiteSettings() {
     nowDate
   );
 
-  if (salesAutoGrowth.incrementCount > 0) {
+  if (salesAutoGrowth.incrementCount > 0 || salesAutoGrowth.shouldPersistTickAt) {
     PropertiesService.getScriptProperties().setProperties({
       [SALES_COUNT_PROPERTY_KEY]: String(salesAutoGrowth.nextCurrentSalesCount),
       [SALES_LAST_TICK_AT_PROPERTY_KEY]: salesAutoGrowth.nextLastSalesTickAt,
-      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: salesAutoGrowth.nextSalesUpdatedAt
+      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: salesAutoGrowth.incrementCount > 0
+        ? salesAutoGrowth.nextSalesUpdatedAt
+        : storedSiteSettings.salesUpdatedAt
     });
   }
 
