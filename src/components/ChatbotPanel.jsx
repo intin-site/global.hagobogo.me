@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function ChatbotPanel({ copy, questions = [], onClose, onOpenInquiry, onViewProposal }) {
+export default function ChatbotPanel({ copy, questions = [], onClose, onOpenInquiry }) {
     const [selectedQuestionId, setSelectedQuestionId] = useState(null);
 
     useEffect(() => {

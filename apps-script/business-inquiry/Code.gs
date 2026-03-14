@@ -8,6 +8,7 @@ const DEFAULT_ADMIN_PASSWORD = '0000';
 const SALES_COUNT_PROPERTY_KEY = 'SITE_SALES_COUNT';
 const DOT_BLUE_RANGE_PROPERTY_KEY = 'SITE_DOT_BLUE_RANGE_JSON';
 const TICKER_ITEMS_PROPERTY_KEY = 'SITE_TICKER_ITEMS_BY_LANGUAGE_JSON';
+const SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY = 'SITE_SETTINGS_UPDATED_AT';
 const DEFAULT_SALES_COUNT = 100000;
 const DEFAULT_DOT_BLUE_RANGE = {
   min: 900,
@@ -154,13 +155,13 @@ function handleAdminAction(payload) {
 
   // 관리자 페이지에서 수정한 사이트 공용 설정을 한 번에 저장합니다.
   if (payload.action === 'SAVE_ADMIN_SETTINGS') {
-    const validationError = validateSiteSettings(payload.siteSettings);
+    const validationError = validateSiteSettingsPatch(payload.siteSettingsPatch);
 
     if (validationError) {
       return validationError;
     }
 
-    const savedSettings = saveSiteSettings(payload.siteSettings);
+    const savedSettings = saveSiteSettings(payload.siteSettingsPatch);
 
     return {
       ok: true,
@@ -269,21 +270,27 @@ function getSiteSettings() {
     notificationEmail: getNotificationEmail() || '',
     salesCount: getSalesCount(),
     dotBlueSpawnFrequencyRange: getDotBlueSpawnFrequencyRange(),
-    tickerItemsByLanguage: getTickerItemsByLanguage()
+    tickerItemsByLanguage: getTickerItemsByLanguage(),
+    updatedAt: getSiteSettingsUpdatedAt()
   };
 }
 
 function saveSiteSettings(siteSettings) {
-  // 관리자 화면에서 저장한 값을 Script Properties에 표준 형식으로 기록합니다.
-  const nextSettings = normalizeSiteSettings(siteSettings);
+  // 관리자 화면에서 전달한 변경 항목만 현재 설정과 병합해 저장합니다.
+  const currentSettings = getSiteSettings();
+  const nextSettings = mergeSiteSettings(currentSettings, normalizeSiteSettingsPatch(siteSettings));
   const scriptProperties = PropertiesService.getScriptProperties();
+  const updatedAt = new Date().toISOString();
 
   scriptProperties.setProperty(NOTIFICATION_EMAIL_PROPERTY_KEY, nextSettings.notificationEmail);
   scriptProperties.setProperty(SALES_COUNT_PROPERTY_KEY, String(nextSettings.salesCount));
   scriptProperties.setProperty(DOT_BLUE_RANGE_PROPERTY_KEY, JSON.stringify(nextSettings.dotBlueSpawnFrequencyRange));
   scriptProperties.setProperty(TICKER_ITEMS_PROPERTY_KEY, JSON.stringify(nextSettings.tickerItemsByLanguage));
+  scriptProperties.setProperty(SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY, updatedAt);
 
-  return nextSettings;
+  return mergeSiteSettings(nextSettings, {
+    updatedAt: updatedAt
+  });
 }
 
 function getAdminPassword() {
@@ -362,6 +369,13 @@ function getTickerItemsByLanguage() {
   }
 }
 
+function getSiteSettingsUpdatedAt() {
+  // 마지막 관리자 저장 시각은 여러 브라우저 동기화 상태 확인에 함께 사용합니다.
+  return PropertiesService
+    .getScriptProperties()
+    .getProperty(SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY) || '';
+}
+
 function createEmptyTickerItemsByLanguageMap() {
   // 언어별 데이터가 없을 때도 화면 로직이 깨지지 않도록 빈 구조를 먼저 만듭니다.
   const itemsByLanguage = {};
@@ -412,23 +426,58 @@ function normalizeDotBlueSpawnFrequencyRange(value) {
   };
 }
 
-function normalizeSiteSettings(siteSettings) {
-  // 관리자 화면에서 전달한 전체 설정을 저장 가능한 공통 형식으로 맞춥니다.
-  const notificationEmail = isValidEmail(siteSettings && siteSettings.notificationEmail)
-    ? siteSettings.notificationEmail.trim()
-    : '';
-  const salesCount = Number(siteSettings && siteSettings.salesCount);
+function normalizeSiteSettingsPatch(siteSettings) {
+  // 관리자 화면에서 전달한 변경 항목만 저장 가능한 공통 형식으로 맞춥니다.
+  const normalizedPatch = {};
 
+  if (!siteSettings || typeof siteSettings !== 'object') {
+    return normalizedPatch;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'notificationEmail')) {
+    normalizedPatch.notificationEmail = typeof siteSettings.notificationEmail === 'string'
+      ? siteSettings.notificationEmail.trim()
+      : '';
+  }
+
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'salesCount')) {
+    normalizedPatch.salesCount = Math.floor(Number(siteSettings.salesCount));
+  }
+
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'dotBlueSpawnFrequencyRange')) {
+    normalizedPatch.dotBlueSpawnFrequencyRange = normalizeDotBlueSpawnFrequencyRange(siteSettings.dotBlueSpawnFrequencyRange);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'tickerItemsByLanguage')) {
+    normalizedPatch.tickerItemsByLanguage = normalizeTickerItemsByLanguageMap(siteSettings.tickerItemsByLanguage);
+  }
+
+  return normalizedPatch;
+}
+
+function mergeSiteSettings(baseSettings, patchSettings) {
+  // 부분 저장 패치를 현재 설정 위에 덮어써 최종 저장값을 만듭니다.
   return {
-    notificationEmail: notificationEmail,
-    salesCount: Number.isFinite(salesCount) && salesCount >= 0 ? Math.floor(salesCount) : DEFAULT_SALES_COUNT,
-    dotBlueSpawnFrequencyRange: normalizeDotBlueSpawnFrequencyRange(siteSettings && siteSettings.dotBlueSpawnFrequencyRange),
-    tickerItemsByLanguage: normalizeTickerItemsByLanguageMap(siteSettings && siteSettings.tickerItemsByLanguage)
+    notificationEmail: Object.prototype.hasOwnProperty.call(patchSettings, 'notificationEmail')
+      ? patchSettings.notificationEmail
+      : baseSettings.notificationEmail,
+    salesCount: Object.prototype.hasOwnProperty.call(patchSettings, 'salesCount')
+      ? patchSettings.salesCount
+      : baseSettings.salesCount,
+    dotBlueSpawnFrequencyRange: Object.prototype.hasOwnProperty.call(patchSettings, 'dotBlueSpawnFrequencyRange')
+      ? patchSettings.dotBlueSpawnFrequencyRange
+      : baseSettings.dotBlueSpawnFrequencyRange,
+    tickerItemsByLanguage: Object.prototype.hasOwnProperty.call(patchSettings, 'tickerItemsByLanguage')
+      ? patchSettings.tickerItemsByLanguage
+      : baseSettings.tickerItemsByLanguage,
+    updatedAt: Object.prototype.hasOwnProperty.call(patchSettings, 'updatedAt')
+      ? patchSettings.updatedAt
+      : baseSettings.updatedAt
   };
 }
 
-function validateSiteSettings(siteSettings) {
-  // 관리자 설정 저장 전에 필수 형식이 맞는지 한 번 더 점검합니다.
+function validateSiteSettingsPatch(siteSettings) {
+  // 관리자 설정 부분 저장 전에 전달된 항목만 형식을 점검합니다.
   if (!siteSettings || typeof siteSettings !== 'object') {
     return {
       ok: false,
@@ -437,7 +486,11 @@ function validateSiteSettings(siteSettings) {
     };
   }
 
-  if (siteSettings.notificationEmail && !isValidEmail(siteSettings.notificationEmail)) {
+  if (
+    Object.prototype.hasOwnProperty.call(siteSettings, 'notificationEmail')
+    && siteSettings.notificationEmail
+    && !isValidEmail(siteSettings.notificationEmail)
+  ) {
     return {
       ok: false,
       code: 'INVALID_NOTIFICATION_EMAIL',
@@ -445,24 +498,49 @@ function validateSiteSettings(siteSettings) {
     };
   }
 
-  const salesCount = Number(siteSettings.salesCount);
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'salesCount')) {
+    const salesCount = Number(siteSettings.salesCount);
 
-  if (!Number.isFinite(salesCount) || salesCount < 0) {
-    return {
-      ok: false,
-      code: 'INVALID_SALES_COUNT',
-      message: '판매 수치는 0 이상의 숫자여야 합니다.'
-    };
+    if (!Number.isFinite(salesCount) || salesCount < 0) {
+      return {
+        ok: false,
+        code: 'INVALID_SALES_COUNT',
+        message: '판매 수치는 0 이상의 숫자여야 합니다.'
+      };
+    }
   }
 
-  const normalizedDotBlueRange = normalizeDotBlueSpawnFrequencyRange(siteSettings.dotBlueSpawnFrequencyRange);
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'dotBlueSpawnFrequencyRange')) {
+    const dotBlueRange = siteSettings.dotBlueSpawnFrequencyRange;
 
-  if (!normalizedDotBlueRange || normalizedDotBlueRange.min <= 0 || normalizedDotBlueRange.max <= 0) {
-    return {
-      ok: false,
-      code: 'INVALID_DOT_BLUE_RANGE',
-      message: 'Dot_blue 발생 빈도는 1 이상의 숫자로 입력해야 합니다.'
-    };
+    if (!dotBlueRange || typeof dotBlueRange !== 'object') {
+      return {
+        ok: false,
+        code: 'INVALID_DOT_BLUE_RANGE',
+        message: 'Dot_blue 발생 빈도 형식이 올바르지 않습니다.'
+      };
+    }
+
+    const min = Number(dotBlueRange.min);
+    const max = Number(dotBlueRange.max);
+
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0) {
+      return {
+        ok: false,
+        code: 'INVALID_DOT_BLUE_RANGE',
+        message: 'Dot_blue 발생 빈도는 1 이상의 숫자로 입력해야 합니다.'
+      };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(siteSettings, 'tickerItemsByLanguage')) {
+    if (!siteSettings.tickerItemsByLanguage || typeof siteSettings.tickerItemsByLanguage !== 'object') {
+      return {
+        ok: false,
+        code: 'INVALID_TICKER_ITEMS',
+        message: '뉴스 ticker 형식이 올바르지 않습니다.'
+      };
+    }
   }
 
   return null;

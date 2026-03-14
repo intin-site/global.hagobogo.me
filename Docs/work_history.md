@@ -3,6 +3,23 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 14:00 - 관리자 부분 저장과 다중 브라우저 공개 설정 재조회 반영
+- `src/components/AdminPage.jsx`, `src/lib/adminApi.js`, `apps-script/business-inquiry/Code.gs`를 수정해 뉴스정보, 판매 수치, Dot_blue 빈도, 알림 메일 저장이 각각 자기 항목만 서버에 부분 저장되도록 구조를 변경
+- `src/components/AdminPage.jsx`, `src/components/Dashboard.jsx`를 수정해 비어 있는 ticker 배열을 기본 문구로 되돌리지 않고 그대로 유지하며, 메인 화면에서는 ticker가 완전히 비어 있으면 노출하지 않도록 정리
+- `src/components/Dashboard.jsx`에 공개 설정 60초 폴링과 탭 복귀 시 재조회 흐름을 추가해 여러 브라우저에서 열린 화면이 관리자 저장값을 다시 따라오도록 보강
+- `src/components/ChatbotPanel.jsx`, `src/components/Dashboard.jsx`에서 미사용 `onViewProposal` 전달 구조를 제거해 `npm run lint`가 다시 통과하도록 정리
+- 검증 결과 `npm run lint`, `npm run build` 모두 통과 확인
+
+## 2026-03-14 13:41 - 관리자 저장 일관성 기준으로 재검수 후 수정 계획서 재정리
+- `AdminPage`, `Dashboard`, `adminApi`, `adminSettings` 현재 구조를 다시 확인해 부분 저장, ticker 빈 값 허용, 45~60초 폴링, 탭 포커스 시 재조회 기준으로 검수
+- 현재 저장 버튼이 모두 전체 설정 객체를 재전송하는 구조, 메인 화면과 관리자 화면이 빈 ticker를 기본 문구로 복구하는 구조, 공개 설정 재조회가 최초 1회만 수행되는 구조를 다시 확인
+- `npm run lint` 재확인 결과 `src/components/ChatbotPanel.jsx`의 미사용 `onViewProposal` 때문에 여전히 실패 상태임을 재검증
+
+## 2026-03-14 13:33 - 관리자 2차 검증 결과를 우선순위 기준 수정 계획으로 재정리
+- 대장님이 정리한 2차 검증 결과 4건을 운영 영향도와 수정 난이도 기준으로 다시 분석
+- 초보자도 이해하기 쉽도록 문제 원인, 왜 먼저 고쳐야 하는지, 어떤 순서로 손봐야 하는지를 계획서 형태로 재정리
+- 실제 코드 수정 전 검토용 계획 단계만 진행하고 구현은 별도 승인 후 시작하도록 정리
+
 ## 2026-03-14 11:45 - 챗봇 FAQ를 전 언어 동일한 5개 질문 구조로 통일
 - `src/data/chatbotFaq.js`의 EN, ES, FR, KR FAQ를 모두 `product`, `strengths`, `audience`, `channels`, `proposal` 순서의 5개 구조로 재정리
 - 대장님이 전달한 문안을 기준으로 각 언어의 질문과 답변을 교체해, 화면 언어가 달라도 같은 정보 구조를 유지하도록 정리

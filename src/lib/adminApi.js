@@ -76,7 +76,7 @@ export async function saveAdminSettings(adminPassword, siteSettings) {
     const data = await postAdminRequest({
         action: 'SAVE_ADMIN_SETTINGS',
         adminPassword,
-        siteSettings,
+        siteSettingsPatch: siteSettings,
     });
 
     return normalizeAdminSiteSettings(data.siteSettings);

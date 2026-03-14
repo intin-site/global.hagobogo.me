@@ -2,9 +2,9 @@ import React, { useRef, useState } from 'react';
 import AdminTickerEditor from './AdminTickerEditor';
 import logoHagobogo from '../../assets/svg/logo_haogobogo.svg';
 import { authenticateAdmin, fetchAdminSettings, saveAdminSettings } from '../lib/adminApi';
-import { TRANSLATIONS } from '../i18n/translations';
 import {
     ADMIN_SETTING_LANGUAGES,
+    createEmptyTickerItemsByLanguageMap,
     formatTickerTextarea,
     normalizeAdminSiteSettings,
     parseTickerTextarea,
@@ -27,29 +27,41 @@ function formatNumericInput(value) {
 }
 
 function createDefaultTickerInputs() {
-    return {
-        EN: [...TRANSLATIONS.EN.ticker],
-        FR: [...TRANSLATIONS.FR.ticker],
-        ES: [...TRANSLATIONS.ES.ticker],
-        KR: [...TRANSLATIONS.KR.ticker],
-    };
+    return createEmptyTickerItemsByLanguageMap();
 }
 
-function buildSiteSettingsFromForm({ notificationEmailInput, salesInput, dotBlueFrequencyMinInput, dotBlueFrequencyMaxInput, tickerInputs }) {
-    const nextTickerItems = ADMIN_SETTING_LANGUAGES.reduce((accumulator, language) => {
+function buildTickerItemsByLanguage(tickerInputs) {
+    return ADMIN_SETTING_LANGUAGES.reduce((accumulator, language) => {
         accumulator[language] = parseTickerTextarea(formatTickerTextarea(tickerInputs[language]));
         return accumulator;
     }, {});
+}
 
-    return normalizeAdminSiteSettings({
-        notificationEmail: notificationEmailInput.trim(),
+function buildTickerSettingsPatch(tickerInputs) {
+    return {
+        tickerItemsByLanguage: buildTickerItemsByLanguage(tickerInputs),
+    };
+}
+
+function buildSalesSettingsPatch(salesInput) {
+    return {
         salesCount: parseNumericInput(salesInput),
+    };
+}
+
+function buildDotBlueSettingsPatch(dotBlueFrequencyMinInput, dotBlueFrequencyMaxInput) {
+    return {
         dotBlueSpawnFrequencyRange: {
             min: parseNumericInput(dotBlueFrequencyMinInput),
             max: parseNumericInput(dotBlueFrequencyMaxInput),
         },
-        tickerItemsByLanguage: nextTickerItems,
-    });
+    };
+}
+
+function buildNotificationEmailSettingsPatch(notificationEmailInput) {
+    return {
+        notificationEmail: notificationEmailInput.trim(),
+    };
 }
 
 function isLocalAdminBypassEnabled() {
@@ -103,10 +115,10 @@ export default function AdminPage() {
         const normalizedSettings = normalizeAdminSiteSettings(siteSettings);
 
         setTickerInputs({
-            EN: normalizedSettings.tickerItemsByLanguage.EN.length > 0 ? normalizedSettings.tickerItemsByLanguage.EN : [...TRANSLATIONS.EN.ticker],
-            FR: normalizedSettings.tickerItemsByLanguage.FR.length > 0 ? normalizedSettings.tickerItemsByLanguage.FR : [...TRANSLATIONS.FR.ticker],
-            ES: normalizedSettings.tickerItemsByLanguage.ES.length > 0 ? normalizedSettings.tickerItemsByLanguage.ES : [...TRANSLATIONS.ES.ticker],
-            KR: normalizedSettings.tickerItemsByLanguage.KR.length > 0 ? normalizedSettings.tickerItemsByLanguage.KR : [...TRANSLATIONS.KR.ticker],
+            EN: [...normalizedSettings.tickerItemsByLanguage.EN],
+            FR: [...normalizedSettings.tickerItemsByLanguage.FR],
+            ES: [...normalizedSettings.tickerItemsByLanguage.ES],
+            KR: [...normalizedSettings.tickerItemsByLanguage.KR],
         });
         setSalesInput(formatNumericInput(normalizedSettings.salesCount));
         setDotBlueFrequencyMinInput(formatNumericInput(normalizedSettings.dotBlueSpawnFrequencyRange.min));
@@ -171,13 +183,7 @@ export default function AdminPage() {
         try {
             const savedSettings = await saveAdminSettings(
                 adminPasswordRef.current,
-                buildSiteSettingsFromForm({
-                    notificationEmailInput,
-                    salesInput,
-                    dotBlueFrequencyMinInput,
-                    dotBlueFrequencyMaxInput,
-                    tickerInputs,
-                })
+                buildTickerSettingsPatch(tickerInputs)
             );
             applySiteSettings(savedSettings);
             setTickerMessage('뉴스정보를 저장했습니다.');
@@ -208,13 +214,7 @@ export default function AdminPage() {
         try {
             const savedSettings = await saveAdminSettings(
                 adminPasswordRef.current,
-                buildSiteSettingsFromForm({
-                    notificationEmailInput,
-                    salesInput,
-                    dotBlueFrequencyMinInput,
-                    dotBlueFrequencyMaxInput,
-                    tickerInputs,
-                })
+                buildSalesSettingsPatch(salesInput)
             );
             applySiteSettings(savedSettings);
             setSalesMessage('판매 수치를 저장했습니다.');
@@ -244,13 +244,7 @@ export default function AdminPage() {
         try {
             const savedSettings = await saveAdminSettings(
                 adminPasswordRef.current,
-                buildSiteSettingsFromForm({
-                    notificationEmailInput,
-                    salesInput,
-                    dotBlueFrequencyMinInput,
-                    dotBlueFrequencyMaxInput,
-                    tickerInputs,
-                })
+                buildDotBlueSettingsPatch(dotBlueFrequencyMinInput, dotBlueFrequencyMaxInput)
             );
             applySiteSettings(savedSettings);
             setDotBlueFrequencyMessage('Dot_blue 시간당 발생 빈도를 저장했습니다.');
@@ -281,13 +275,7 @@ export default function AdminPage() {
         try {
             const savedSettings = await saveAdminSettings(
                 adminPasswordRef.current,
-                buildSiteSettingsFromForm({
-                    notificationEmailInput,
-                    salesInput,
-                    dotBlueFrequencyMinInput,
-                    dotBlueFrequencyMaxInput,
-                    tickerInputs,
-                })
+                buildNotificationEmailSettingsPatch(notificationEmailInput)
             );
             applySiteSettings(savedSettings);
             setNotificationEmailMessage('알림 수신 메일 주소를 저장했습니다.');

@@ -45,6 +45,7 @@ function createInitialTargetMetrics() {
 }
 
 export default function Dashboard() {
+    const publicSettingsPollingIntervalMs = 60000;
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
     const [sales, setSales] = useState(DEFAULT_SALES_COUNT);
@@ -79,6 +80,8 @@ export default function Dashboard() {
     const pulseTimeoutRef = useRef(null);
     const lineTimeoutRef = useRef(null);
     const salesRevealTimeoutRef = useRef(null);
+    const publicSettingsPollingIntervalRef = useRef(null);
+    const isFetchingPublicSiteSettingsRef = useRef(false);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
     const proposalBoardRef = useRef(null);
@@ -90,45 +93,84 @@ export default function Dashboard() {
     const chatbotQuestions = CHATBOT_FAQ[language] || CHATBOT_FAQ.EN || [];
     const proposalFileName = PROPOSAL_FILE_BY_LANGUAGE[language] || PROPOSAL_FILE_BY_LANGUAGE.EN;
     const tickerItems = siteSettings.tickerItemsByLanguage[language] || [];
-    const visibleTickerItems = tickerItems.length > 0 ? tickerItems : copy.ticker;
+    const visibleTickerItems = tickerItems;
 
-    useEffect(() => {
-        let isMounted = true;
+    const loadPublicSiteSettings = useCallback(async ({ revealSales = false } = {}) => {
+        if (isFetchingPublicSiteSettingsRef.current) {
+            return;
+        }
 
-        fetchPublicSiteSettings()
-            .then((nextSiteSettings) => {
-                if (!isMounted) {
-                    return;
+        isFetchingPublicSiteSettingsRef.current = true;
+
+        try {
+            const nextSiteSettings = await fetchPublicSiteSettings();
+            const normalizedSettings = normalizeAdminSiteSettings(nextSiteSettings);
+
+            setSiteSettings((previousSettings) => {
+                const hasSameSalesCount = previousSettings.salesCount === normalizedSettings.salesCount;
+                const hasSameDotBlueRange = (
+                    previousSettings.dotBlueSpawnFrequencyRange.min === normalizedSettings.dotBlueSpawnFrequencyRange.min
+                    && previousSettings.dotBlueSpawnFrequencyRange.max === normalizedSettings.dotBlueSpawnFrequencyRange.max
+                );
+                const hasSameTickerItems = JSON.stringify(previousSettings.tickerItemsByLanguage) === JSON.stringify(normalizedSettings.tickerItemsByLanguage);
+
+                if (hasSameSalesCount && hasSameDotBlueRange && hasSameTickerItems) {
+                    return previousSettings;
                 }
 
-                const normalizedSettings = normalizeAdminSiteSettings(nextSiteSettings);
-                setSiteSettings(normalizedSettings);
-                setSales(normalizedSettings.salesCount);
+                return normalizedSettings;
+            });
+            setSales(normalizedSettings.salesCount);
+
+            if (revealSales) {
+                if (salesRevealTimeoutRef.current) {
+                    window.clearTimeout(salesRevealTimeoutRef.current);
+                }
 
                 salesRevealTimeoutRef.current = window.setTimeout(() => {
-                    if (!isMounted) {
-                        return;
-                    }
-
                     setIsSalesVisible(true);
                 }, 200);
-            })
-            .catch((error) => {
-                console.error('공개 사이트 설정을 불러오지 못했습니다.', error);
+            } else {
+                setIsSalesVisible(true);
+            }
+        } catch (error) {
+            console.error('공개 사이트 설정을 불러오지 못했습니다.', error);
 
-                if (isMounted) {
-                    setIsSalesVisible(true);
-                }
-            });
+            if (revealSales) {
+                setIsSalesVisible(true);
+            }
+        } finally {
+            isFetchingPublicSiteSettingsRef.current = false;
+        }
+    }, []);
+
+    useEffect(() => {
+        loadPublicSiteSettings({ revealSales: true });
+
+        publicSettingsPollingIntervalRef.current = window.setInterval(() => {
+            loadPublicSiteSettings();
+        }, publicSettingsPollingIntervalMs);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                loadPublicSiteSettings();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            isMounted = false;
-
             if (salesRevealTimeoutRef.current) {
                 window.clearTimeout(salesRevealTimeoutRef.current);
             }
+
+            if (publicSettingsPollingIntervalRef.current) {
+                window.clearInterval(publicSettingsPollingIntervalRef.current);
+            }
+
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, []);
+    }, [loadPublicSiteSettings, publicSettingsPollingIntervalMs]);
 
     useEffect(() => {
         return () => {
@@ -315,14 +357,6 @@ export default function Dashboard() {
         setIsInquiryModalOpen(true);
     }, []);
 
-    const handleViewProposal = useCallback(() => {
-        setIsChatbotOpen(false);
-        proposalBoardRef.current?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-        });
-    }, []);
-
     return (
         <div className={`relative w-full min-h-screen flex justify-center overflow-x-hidden bg-[#bfc5cc] text-[#bfc5cc] ${language === 'KR' ? 'lang-kr' : ''}`}>
             {isInquiryModalOpen && (
@@ -340,7 +374,6 @@ export default function Dashboard() {
                     questions={chatbotQuestions}
                     onClose={() => setIsChatbotOpen(false)}
                     onOpenInquiry={handleOpenInquiryModal}
-                    onViewProposal={handleViewProposal}
                 />
             )}
 
@@ -417,40 +450,42 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            <div className="news-ticker-wrap">
-                <div className="news-ticker-track">
-                    <div className="news-ticker-sequence">
-                        {visibleTickerItems.map((item, index) => (
-                            item === '' ? (
-                                <div
-                                    key={`spacer-${index}`}
-                                    className="news-ticker-spacer"
-                                    aria-hidden="true"
-                                />
-                            ) : (
-                                <p key={`${item}-${index}`} className="news-ticker-text">
-                                    {item}
-                                </p>
-                            )
-                        ))}
-                    </div>
-                    <div className="news-ticker-sequence" aria-hidden="true">
-                        {visibleTickerItems.map((item, index) => (
-                            item === '' ? (
-                                <div
-                                    key={`duplicate-spacer-${index}`}
-                                    className="news-ticker-spacer"
-                                    aria-hidden="true"
-                                />
-                            ) : (
-                                <p key={`duplicate-${item}-${index}`} className="news-ticker-text">
-                                    {item}
-                                </p>
-                            )
-                        ))}
+            {visibleTickerItems.length > 0 ? (
+                <div className="news-ticker-wrap">
+                    <div className="news-ticker-track">
+                        <div className="news-ticker-sequence">
+                            {visibleTickerItems.map((item, index) => (
+                                item === '' ? (
+                                    <div
+                                        key={`spacer-${index}`}
+                                        className="news-ticker-spacer"
+                                        aria-hidden="true"
+                                    />
+                                ) : (
+                                    <p key={`${item}-${index}`} className="news-ticker-text">
+                                        {item}
+                                    </p>
+                                )
+                            ))}
+                        </div>
+                        <div className="news-ticker-sequence" aria-hidden="true">
+                            {visibleTickerItems.map((item, index) => (
+                                item === '' ? (
+                                    <div
+                                        key={`duplicate-spacer-${index}`}
+                                        className="news-ticker-spacer"
+                                        aria-hidden="true"
+                                    />
+                                ) : (
+                                    <p key={`duplicate-${item}-${index}`} className="news-ticker-text">
+                                        {item}
+                                    </p>
+                                )
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
+            ) : null}
 
             <div className="main-content-stack relative z-20 flex w-full flex-col items-center gap-[40px]">
                 <div ref={sphereGroupRef} className="relative flex items-center justify-center px-[20px] pt-[20px] pb-[20px] pointer-events-none">
