@@ -263,13 +263,27 @@
     const MESSAGE_TYPE = 'HAGOBOGO_PROPOSAL_HEIGHT';
     let postHeightRafId = 0;
 
+    function measureContentHeight() {
+      const body = document.body;
+      if (!body) {
+        return 0;
+      }
+
+      const bodyRect = body.getBoundingClientRect();
+      const bodyStyle = window.getComputedStyle(body);
+      const bodyPaddingBottom = parseFloat(bodyStyle.paddingBottom || '0') || 0;
+      let maxContentBottom = 0;
+
+      Array.from(body.children).forEach(function (element) {
+        const elementRect = element.getBoundingClientRect();
+        maxContentBottom = Math.max(maxContentBottom, elementRect.bottom - bodyRect.top);
+      });
+
+      return Math.ceil(maxContentBottom + bodyPaddingBottom);
+    }
+
     function postHeightToParent() {
-      const nextHeight = Math.max(
-        document.documentElement ? document.documentElement.scrollHeight : 0,
-        document.body ? document.body.scrollHeight : 0,
-        document.documentElement ? document.documentElement.offsetHeight : 0,
-        document.body ? document.body.offsetHeight : 0
-      );
+      const nextHeight = measureContentHeight();
 
       window.parent.postMessage({
         type: MESSAGE_TYPE,
