@@ -6,7 +6,7 @@ const NOTIFICATION_EMAIL_PROPERTY_KEY = 'BUSINESS_INQUIRY_NOTIFICATION_EMAIL';
 const ADMIN_PASSWORD_PROPERTY_KEY = 'ADMIN_PAGE_PASSWORD';
 const DEFAULT_ADMIN_PASSWORD = '0000';
 const SALES_COUNT_PROPERTY_KEY = 'SITE_SALES_COUNT';
-const SALES_INCREMENT_PROPERTY_KEY = 'SITE_SALES_INCREMENT';
+const SALES_LAST_TICK_AT_PROPERTY_KEY = 'SITE_LAST_SALES_TICK_AT';
 const DOT_BLUE_RANGE_PROPERTY_KEY = 'SITE_DOT_BLUE_RANGE_JSON';
 const TICKER_ITEMS_PROPERTY_KEY = 'SITE_TICKER_ITEMS_BY_LANGUAGE_JSON';
 const SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY = 'SITE_SETTINGS_UPDATED_AT';
@@ -22,6 +22,7 @@ const STATUS_HEADER_NAME = 'Status';
 const DUPLICATE_SUBMISSION_WINDOW_SECONDS = 120;
 const SCRIPT_LOCK_WAIT_TIMEOUT_MS = 10000;
 const SHEET_TEXT_NUMBER_FORMAT = '@STRING@';
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function doGet() {
   // 웹앱이 살아 있는지 간단히 확인할 수 있는 상태 확인 응답입니다.
@@ -138,7 +139,7 @@ function handleAdminAction(payload) {
     return {
       ok: true,
       code: 'PUBLIC_SITE_SETTINGS_LOADED',
-      siteSettings: getSiteSettings()
+      siteSettings: getLiveSiteSettings()
     };
   }
 
@@ -165,7 +166,7 @@ function handleAdminAction(payload) {
     return {
       ok: true,
       code: 'ADMIN_SETTINGS_LOADED',
-      siteSettings: getSiteSettings()
+      siteSettings: getLiveSiteSettings()
     };
   }
 
@@ -183,27 +184,6 @@ function handleAdminAction(payload) {
       ok: true,
       code: 'ADMIN_SETTINGS_SAVED',
       message: '관리자 설정을 저장했습니다.',
-      siteSettings: savedSettings
-    };
-  }
-
-  if (payload.action === 'INCREMENT_PUBLIC_SALES_COUNT') {
-    const incrementBy = Number(payload.incrementBy);
-
-    if (!Number.isFinite(incrementBy) || incrementBy <= 0) {
-      return {
-        ok: false,
-        code: 'INVALID_SALES_INCREMENT',
-        message: '증가값은 1 이상의 숫자여야 합니다.'
-      };
-    }
-
-    const savedSettings = incrementPublicSalesCount(Math.floor(incrementBy));
-
-    return {
-      ok: true,
-      code: 'PUBLIC_SALES_COUNT_INCREMENTED',
-      message: '판매 카운트 증가분을 저장했습니다.',
       siteSettings: savedSettings
     };
   }
@@ -301,76 +281,72 @@ function getNotificationEmail() {
     .getProperty(NOTIFICATION_EMAIL_PROPERTY_KEY);
 }
 
-function getSiteSettings() {
-  // 메인 페이지와 관리자 페이지가 함께 쓰는 공용 설정 묶음을 구성합니다.
-  const salesCount = getSalesCount();
-  const salesIncrement = getSalesIncrement();
+function getStoredSiteSettings() {
+  // 저장소에 기록된 현재 사이트 설정을 그대로 읽어 옵니다.
+  const currentSalesCount = getSalesCount();
 
   return {
     notificationEmail: getNotificationEmail() || '',
-    salesCount: salesCount,
-    salesIncrement: salesIncrement,
-    currentSalesCount: salesCount + salesIncrement,
+    salesCount: currentSalesCount,
+    currentSalesCount: currentSalesCount,
     dotBlueSpawnFrequencyRange: getDotBlueSpawnFrequencyRange(),
     tickerItemsByLanguage: getTickerItemsByLanguage(),
     updatedAt: getSiteSettingsUpdatedAt(),
-    salesUpdatedAt: getSalesUpdatedAt()
+    salesUpdatedAt: getSalesUpdatedAt(),
+    lastSalesTickAt: getLastSalesTickAt()
   };
+}
+
+function getLiveSiteSettings() {
+  // 공개 조회와 관리자 조회 시점에 시간 기준 자동 증가분을 반영한 최신 설정을 반환합니다.
+  return runWithScriptLock(function() {
+    return applySalesAutoGrowthAndGetSiteSettings();
+  });
 }
 
 function saveSiteSettings(siteSettings) {
   // 관리자 화면에서 전달한 변경 항목만 현재 설정과 병합해 저장합니다.
   return runWithScriptLock(function() {
-    const currentSettings = getSiteSettings();
+    const currentSettings = applySalesAutoGrowthAndGetSiteSettings();
     const nextSettings = mergeSiteSettings(currentSettings, normalizeSiteSettingsPatch(siteSettings));
     const scriptProperties = PropertiesService.getScriptProperties();
     const updatedAt = new Date().toISOString();
-    const shouldResetSalesIncrement = Object.prototype.hasOwnProperty.call(siteSettings, 'salesCount');
-    const nextSalesIncrement = shouldResetSalesIncrement ? 0 : nextSettings.salesIncrement;
+    const shouldResetSalesTickClock = (
+      Object.prototype.hasOwnProperty.call(siteSettings, 'salesCount')
+      || Object.prototype.hasOwnProperty.call(siteSettings, 'dotBlueSpawnFrequencyRange')
+    );
+    const nextLastSalesTickAt = shouldResetSalesTickClock
+      ? updatedAt
+      : currentSettings.lastSalesTickAt;
+    const nextSalesUpdatedAt = Object.prototype.hasOwnProperty.call(siteSettings, 'salesCount')
+      ? updatedAt
+      : currentSettings.salesUpdatedAt;
 
     // 여러 설정값을 한 번에 기록해 저장 중 일부만 반영되는 반쪽 상태를 막습니다.
     scriptProperties.setProperties({
       [NOTIFICATION_EMAIL_PROPERTY_KEY]: nextSettings.notificationEmail,
-      [SALES_COUNT_PROPERTY_KEY]: String(nextSettings.salesCount),
-      [SALES_INCREMENT_PROPERTY_KEY]: String(nextSalesIncrement),
+      [SALES_COUNT_PROPERTY_KEY]: String(nextSettings.currentSalesCount),
+      [SALES_LAST_TICK_AT_PROPERTY_KEY]: nextLastSalesTickAt,
       [DOT_BLUE_RANGE_PROPERTY_KEY]: JSON.stringify(nextSettings.dotBlueSpawnFrequencyRange),
       [TICKER_ITEMS_PROPERTY_KEY]: JSON.stringify(nextSettings.tickerItemsByLanguage),
       [SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY]: updatedAt,
-      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: shouldResetSalesIncrement
-        ? updatedAt
-        : getSalesUpdatedAt()
+      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: nextSalesUpdatedAt
     });
 
     return mergeSiteSettings(nextSettings, {
-      salesIncrement: nextSalesIncrement,
-      currentSalesCount: nextSettings.salesCount + nextSalesIncrement,
+      salesCount: nextSettings.currentSalesCount,
+      currentSalesCount: nextSettings.currentSalesCount,
       updatedAt: updatedAt,
-      salesUpdatedAt: shouldResetSalesIncrement
-        ? updatedAt
-        : getSalesUpdatedAt()
+      salesUpdatedAt: nextSalesUpdatedAt,
+      lastSalesTickAt: nextLastSalesTickAt
     });
   });
 }
 
-function incrementPublicSalesCount(incrementBy) {
-  // 브라우저에서 모은 판매 증가분을 원자적으로 누적 저장합니다.
-  return runWithScriptLock(function() {
-    const scriptProperties = PropertiesService.getScriptProperties();
-    const nextSalesIncrement = getSalesIncrement() + incrementBy;
-    const updatedAt = new Date().toISOString();
-
-    scriptProperties.setProperties({
-      [SALES_INCREMENT_PROPERTY_KEY]: String(nextSalesIncrement),
-      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: updatedAt
-    });
-
-    const currentSettings = getSiteSettings();
-
-    return mergeSiteSettings(currentSettings, {
-      salesIncrement: nextSalesIncrement,
-      currentSalesCount: currentSettings.salesCount + nextSalesIncrement,
-      salesUpdatedAt: updatedAt
-    });
+function runSalesCounterTimeTrigger() {
+  // 시간 기반 트리거에서 호출해 판매 카운트를 서버 쪽에서 미리 최신값으로 맞춥니다.
+  runWithScriptLock(function() {
+    applySalesAutoGrowthAndGetSiteSettings();
   });
 }
 
@@ -429,20 +405,6 @@ function getSalesCount() {
   return DEFAULT_SALES_COUNT;
 }
 
-function getSalesIncrement() {
-  // 서버에 누적된 실시간 증가분을 읽고, 이상한 값이면 0으로 되돌립니다.
-  const rawValue = PropertiesService
-    .getScriptProperties()
-    .getProperty(SALES_INCREMENT_PROPERTY_KEY);
-  const numericValue = Number(rawValue);
-
-  if (Number.isFinite(numericValue) && numericValue >= 0) {
-    return Math.floor(numericValue);
-  }
-
-  return 0;
-}
-
 function getDotBlueSpawnFrequencyRange() {
   // Dot_blue 발생 빈도는 JSON 문자열로 저장해 두었다가 범위 객체로 복원합니다.
   const rawValue = PropertiesService
@@ -491,6 +453,107 @@ function getSalesUpdatedAt() {
   return PropertiesService
     .getScriptProperties()
     .getProperty(SITE_SALES_UPDATED_AT_PROPERTY_KEY) || '';
+}
+
+function getLastSalesTickAt() {
+  // 마지막 자동 증가 계산 시각은 다음 누적분 계산의 기준점으로 사용합니다.
+  const storedValue = PropertiesService
+    .getScriptProperties()
+    .getProperty(SALES_LAST_TICK_AT_PROPERTY_KEY);
+
+  if (isValidIsoDateString(storedValue)) {
+    return storedValue;
+  }
+
+  return new Date().toISOString();
+}
+
+function isValidIsoDateString(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(value).getTime());
+}
+
+function getAverageHourlySalesCount(dotBlueSpawnFrequencyRange) {
+  // 관리자 범위값의 평균을 시간당 자동 증가량으로 사용합니다.
+  const normalizedRange = normalizeDotBlueSpawnFrequencyRange(dotBlueSpawnFrequencyRange);
+  return (normalizedRange.min + normalizedRange.max) / 2;
+}
+
+function calculateSalesAutoGrowth(currentSalesCount, lastSalesTickAt, dotBlueSpawnFrequencyRange, nowDate) {
+  // 마지막 계산 시각부터 지금까지 몇 건이 늘어났는지 시간 기준으로 계산합니다.
+  const averageHourlySalesCount = getAverageHourlySalesCount(dotBlueSpawnFrequencyRange);
+  const currentTimeMs = nowDate.getTime();
+  const lastSalesTickAtMs = new Date(lastSalesTickAt).getTime();
+
+  if (!Number.isFinite(averageHourlySalesCount) || averageHourlySalesCount <= 0) {
+    return {
+      nextCurrentSalesCount: currentSalesCount,
+      nextLastSalesTickAt: lastSalesTickAt,
+      nextSalesUpdatedAt: getSalesUpdatedAt(),
+      incrementCount: 0
+    };
+  }
+
+  if (!Number.isFinite(lastSalesTickAtMs) || lastSalesTickAtMs > currentTimeMs) {
+    return {
+      nextCurrentSalesCount: currentSalesCount,
+      nextLastSalesTickAt: nowDate.toISOString(),
+      nextSalesUpdatedAt: getSalesUpdatedAt(),
+      incrementCount: 0
+    };
+  }
+
+  const millisecondsPerSale = ONE_HOUR_MS / averageHourlySalesCount;
+  const elapsedMs = currentTimeMs - lastSalesTickAtMs;
+  const incrementCount = Math.floor(elapsedMs / millisecondsPerSale);
+
+  if (incrementCount <= 0) {
+    return {
+      nextCurrentSalesCount: currentSalesCount,
+      nextLastSalesTickAt: lastSalesTickAt,
+      nextSalesUpdatedAt: getSalesUpdatedAt(),
+      incrementCount: 0
+    };
+  }
+
+  const nextLastSalesTickAtMs = lastSalesTickAtMs + (incrementCount * millisecondsPerSale);
+
+  return {
+    nextCurrentSalesCount: currentSalesCount + incrementCount,
+    nextLastSalesTickAt: new Date(Math.floor(nextLastSalesTickAtMs)).toISOString(),
+    nextSalesUpdatedAt: nowDate.toISOString(),
+    incrementCount: incrementCount
+  };
+}
+
+function applySalesAutoGrowthAndGetSiteSettings() {
+  // 저장된 현재 카운트에 시간 기준 자동 증가분을 반영한 뒤 최신 설정을 반환합니다.
+  const storedSiteSettings = getStoredSiteSettings();
+  const nowDate = new Date();
+  const salesAutoGrowth = calculateSalesAutoGrowth(
+    storedSiteSettings.currentSalesCount,
+    storedSiteSettings.lastSalesTickAt,
+    storedSiteSettings.dotBlueSpawnFrequencyRange,
+    nowDate
+  );
+
+  if (salesAutoGrowth.incrementCount > 0) {
+    PropertiesService.getScriptProperties().setProperties({
+      [SALES_COUNT_PROPERTY_KEY]: String(salesAutoGrowth.nextCurrentSalesCount),
+      [SALES_LAST_TICK_AT_PROPERTY_KEY]: salesAutoGrowth.nextLastSalesTickAt,
+      [SITE_SALES_UPDATED_AT_PROPERTY_KEY]: salesAutoGrowth.nextSalesUpdatedAt
+    });
+  }
+
+  return mergeSiteSettings(storedSiteSettings, {
+    salesCount: salesAutoGrowth.nextCurrentSalesCount,
+    currentSalesCount: salesAutoGrowth.nextCurrentSalesCount,
+    salesUpdatedAt: salesAutoGrowth.nextSalesUpdatedAt,
+    lastSalesTickAt: salesAutoGrowth.nextLastSalesTickAt
+  });
 }
 
 function createEmptyTickerItemsByLanguageMap() {
@@ -577,19 +640,16 @@ function mergeSiteSettings(baseSettings, patchSettings) {
   const nextSalesCount = Object.prototype.hasOwnProperty.call(patchSettings, 'salesCount')
     ? patchSettings.salesCount
     : baseSettings.salesCount;
-  const nextSalesIncrement = Object.prototype.hasOwnProperty.call(patchSettings, 'salesIncrement')
-    ? patchSettings.salesIncrement
-    : baseSettings.salesIncrement;
+  const nextCurrentSalesCount = Object.prototype.hasOwnProperty.call(patchSettings, 'currentSalesCount')
+    ? patchSettings.currentSalesCount
+    : baseSettings.currentSalesCount;
 
   return {
     notificationEmail: Object.prototype.hasOwnProperty.call(patchSettings, 'notificationEmail')
       ? patchSettings.notificationEmail
       : baseSettings.notificationEmail,
     salesCount: nextSalesCount,
-    salesIncrement: nextSalesIncrement,
-    currentSalesCount: Object.prototype.hasOwnProperty.call(patchSettings, 'currentSalesCount')
-      ? patchSettings.currentSalesCount
-      : nextSalesCount + nextSalesIncrement,
+    currentSalesCount: nextCurrentSalesCount,
     dotBlueSpawnFrequencyRange: Object.prototype.hasOwnProperty.call(patchSettings, 'dotBlueSpawnFrequencyRange')
       ? patchSettings.dotBlueSpawnFrequencyRange
       : baseSettings.dotBlueSpawnFrequencyRange,
@@ -601,7 +661,10 @@ function mergeSiteSettings(baseSettings, patchSettings) {
       : baseSettings.updatedAt,
     salesUpdatedAt: Object.prototype.hasOwnProperty.call(patchSettings, 'salesUpdatedAt')
       ? patchSettings.salesUpdatedAt
-      : baseSettings.salesUpdatedAt
+      : baseSettings.salesUpdatedAt,
+    lastSalesTickAt: Object.prototype.hasOwnProperty.call(patchSettings, 'lastSalesTickAt')
+      ? patchSettings.lastSalesTickAt
+      : baseSettings.lastSalesTickAt
   };
 }
 

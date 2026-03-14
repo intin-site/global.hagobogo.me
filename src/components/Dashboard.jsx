@@ -16,12 +16,15 @@ import {
     DEFAULT_SALES_COUNT,
     normalizeAdminSiteSettings,
 } from '../utils/adminSettings';
-import { fetchPublicSiteSettings, incrementPublicSalesCount } from '../lib/adminApi';
+import { fetchPublicSiteSettings } from '../lib/adminApi';
 
 const LANGUAGE_STORAGE_KEY = 'site_language';
 const PROPOSAL_HEIGHT_MESSAGE_TYPE = 'HAGOBOGO_PROPOSAL_HEIGHT';
-const SALES_SYNC_DEBOUNCE_MS = 2500;
-const SALES_SYNC_BATCH_SIZE = 10;
+const PUBLIC_SETTINGS_POLLING_MIN_MS = 60000;
+const PUBLIC_SETTINGS_POLLING_MAX_MS = 100000;
+const PUBLIC_SETTINGS_FOCUS_THROTTLE_MS = 15000;
+const MAX_FULL_ANIMATION_DIFF = 3;
+const REPRESENTATIVE_ANIMATION_COUNT = 2;
 const PROPOSAL_FILE_BY_LANGUAGE = {
     EN: 'Hagobogo_Proposal_en_v01.html',
     ES: 'Hagobogo_Proposal_es_v01.html',
@@ -47,13 +50,14 @@ function createInitialTargetMetrics() {
     };
 }
 
+function getRandomPollingDelayMs() {
+    return PUBLIC_SETTINGS_POLLING_MIN_MS + Math.random() * (PUBLIC_SETTINGS_POLLING_MAX_MS - PUBLIC_SETTINGS_POLLING_MIN_MS);
+}
+
 export default function Dashboard() {
-    const publicSettingsPollingIntervalMs = 60000;
-    const publicSettingsFocusThrottleMs = 15000;
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
-    const [syncedSales, setSyncedSales] = useState(DEFAULT_SALES_COUNT);
-    const [pendingSalesHits, setPendingSalesHits] = useState(0);
+    const [displayedSales, setDisplayedSales] = useState(DEFAULT_SALES_COUNT);
     const [isSalesVisible, setIsSalesVisible] = useState(false);
     const [language, setLanguage] = useState(() => {
         if (typeof window === 'undefined') {
@@ -73,6 +77,7 @@ export default function Dashboard() {
     });
     const [siteSettings, setSiteSettings] = useState(() => normalizeAdminSiteSettings({
         salesCount: DEFAULT_SALES_COUNT,
+        currentSalesCount: DEFAULT_SALES_COUNT,
         dotBlueSpawnFrequencyRange: DEFAULT_DOT_BLUE_SPAWN_FREQUENCY_RANGE,
         tickerItemsByLanguage: createEmptyTickerItemsByLanguageMap(),
     }));
@@ -82,15 +87,18 @@ export default function Dashboard() {
     const [isPulsing, setIsPulsing] = useState(false);
     const [isLineHit, setIsLineHit] = useState(false);
     const [targetMetrics, setTargetMetrics] = useState(createInitialTargetMetrics);
+    const [blueManualSpawnSignal, setBlueManualSpawnSignal] = useState(0);
     const pulseTimeoutRef = useRef(null);
     const lineTimeoutRef = useRef(null);
     const salesRevealTimeoutRef = useRef(null);
-    const salesSyncTimeoutRef = useRef(null);
-    const publicSettingsPollingIntervalRef = useRef(null);
+    const publicSettingsPollingTimeoutRef = useRef(null);
     const isFetchingPublicSiteSettingsRef = useRef(false);
-    const isSyncingSalesRef = useRef(false);
     const lastPublicSiteSettingsRequestAtRef = useRef(0);
-    const pendingSalesHitsRef = useRef(0);
+    const hasLoadedInitialSalesRef = useRef(false);
+    const displayedSalesRef = useRef(DEFAULT_SALES_COUNT);
+    const targetSalesCountRef = useRef(DEFAULT_SALES_COUNT);
+    const pendingBlueAnimationCountRef = useRef(0);
+    const activeBlueAnimationCountRef = useRef(0);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
     const proposalIframeRef = useRef(null);
@@ -100,9 +108,87 @@ export default function Dashboard() {
     const proposalFileName = PROPOSAL_FILE_BY_LANGUAGE[language] || PROPOSAL_FILE_BY_LANGUAGE.EN;
     const tickerItems = siteSettings.tickerItemsByLanguage[language] || [];
     const visibleTickerItems = tickerItems;
-    const displayedSales = syncedSales + pendingSalesHits;
 
-    const loadPublicSiteSettings = useCallback(async ({ revealSales = false } = {}) => {
+    const triggerSalesPulse = useCallback(() => {
+        setIsPulsing(false);
+        setIsLineHit(false);
+
+        if (pulseTimeoutRef.current) {
+            window.clearTimeout(pulseTimeoutRef.current);
+        }
+
+        if (lineTimeoutRef.current) {
+            window.clearTimeout(lineTimeoutRef.current);
+        }
+
+        requestAnimationFrame(() => setIsPulsing(true));
+        requestAnimationFrame(() => setIsLineHit(true));
+
+        pulseTimeoutRef.current = window.setTimeout(() => {
+            setIsPulsing(false);
+        }, 1300);
+
+        lineTimeoutRef.current = window.setTimeout(() => {
+            setIsLineHit(false);
+        }, 500);
+    }, []);
+
+    const scheduleNextPublicSettingsPoll = useCallback((callback) => {
+        if (publicSettingsPollingTimeoutRef.current) {
+            window.clearTimeout(publicSettingsPollingTimeoutRef.current);
+        }
+
+        publicSettingsPollingTimeoutRef.current = window.setTimeout(() => {
+            callback();
+        }, getRandomPollingDelayMs());
+    }, []);
+
+    const launchNextBlueAnimation = useCallback(() => {
+        if (activeBlueAnimationCountRef.current > 0 || pendingBlueAnimationCountRef.current <= 0) {
+            return;
+        }
+
+        pendingBlueAnimationCountRef.current -= 1;
+        activeBlueAnimationCountRef.current = 1;
+        setBlueManualSpawnSignal((previousValue) => previousValue + 1);
+    }, []);
+
+    const syncDisplayedSalesToServer = useCallback((nextSalesCount) => {
+        displayedSalesRef.current = nextSalesCount;
+        targetSalesCountRef.current = nextSalesCount;
+        pendingBlueAnimationCountRef.current = 0;
+        activeBlueAnimationCountRef.current = 0;
+        setDisplayedSales(nextSalesCount);
+    }, []);
+
+    const applySalesDifferenceAnimation = useCallback((nextSalesCount) => {
+        if (!hasLoadedInitialSalesRef.current) {
+            hasLoadedInitialSalesRef.current = true;
+            syncDisplayedSalesToServer(nextSalesCount);
+            return;
+        }
+
+        if (nextSalesCount <= displayedSalesRef.current) {
+            syncDisplayedSalesToServer(nextSalesCount);
+            return;
+        }
+
+        targetSalesCountRef.current = nextSalesCount;
+
+        const salesGap = nextSalesCount - displayedSalesRef.current;
+        const desiredAnimationCount = salesGap <= MAX_FULL_ANIMATION_DIFF
+            ? salesGap
+            : REPRESENTATIVE_ANIMATION_COUNT;
+        const currentPlannedAnimationCount = pendingBlueAnimationCountRef.current + activeBlueAnimationCountRef.current;
+        const additionalAnimationCount = Math.max(0, desiredAnimationCount - currentPlannedAnimationCount);
+
+        if (additionalAnimationCount > 0) {
+            pendingBlueAnimationCountRef.current += additionalAnimationCount;
+            launchNextBlueAnimation();
+        }
+    }, [launchNextBlueAnimation, syncDisplayedSalesToServer]);
+
+    const loadPublicSiteSettings = useCallback(async ({ revealSales = false, reschedule = true } = {}) => {
         if (isFetchingPublicSiteSettingsRef.current) {
             return;
         }
@@ -115,21 +201,25 @@ export default function Dashboard() {
             const normalizedSettings = normalizeAdminSiteSettings(nextSiteSettings);
 
             setSiteSettings((previousSettings) => {
-                const hasSameSalesCount = previousSettings.salesCount === normalizedSettings.salesCount;
-                const hasSameSalesIncrement = previousSettings.salesIncrement === normalizedSettings.salesIncrement;
+                const hasSameCurrentSalesCount = previousSettings.currentSalesCount === normalizedSettings.currentSalesCount;
                 const hasSameDotBlueRange = (
                     previousSettings.dotBlueSpawnFrequencyRange.min === normalizedSettings.dotBlueSpawnFrequencyRange.min
                     && previousSettings.dotBlueSpawnFrequencyRange.max === normalizedSettings.dotBlueSpawnFrequencyRange.max
                 );
                 const hasSameTickerItems = JSON.stringify(previousSettings.tickerItemsByLanguage) === JSON.stringify(normalizedSettings.tickerItemsByLanguage);
 
-                if (hasSameSalesCount && hasSameSalesIncrement && hasSameDotBlueRange && hasSameTickerItems) {
+                if (hasSameCurrentSalesCount && hasSameDotBlueRange && hasSameTickerItems) {
                     return previousSettings;
                 }
 
                 return normalizedSettings;
             });
-            setSyncedSales(normalizedSettings.currentSalesCount);
+
+            if (revealSales) {
+                syncDisplayedSalesToServer(normalizedSettings.currentSalesCount);
+            } else {
+                applySalesDifferenceAnimation(normalizedSettings.currentSalesCount);
+            }
 
             if (revealSales) {
                 if (salesRevealTimeoutRef.current) {
@@ -150,63 +240,28 @@ export default function Dashboard() {
             }
         } finally {
             isFetchingPublicSiteSettingsRef.current = false;
+
+            if (reschedule) {
+                scheduleNextPublicSettingsPoll(() => {
+                    loadPublicSiteSettings();
+                });
+            }
         }
-    }, []);
-
-    const flushPendingSalesHits = useCallback(async () => {
-        if (isSyncingSalesRef.current || pendingSalesHitsRef.current <= 0) {
-            return;
-        }
-
-        const incrementBy = pendingSalesHitsRef.current;
-
-        isSyncingSalesRef.current = true;
-
-        try {
-            const normalizedSettings = await incrementPublicSalesCount(incrementBy);
-
-            setSiteSettings((previousSettings) => {
-                const hasSameSalesCount = previousSettings.salesCount === normalizedSettings.salesCount;
-                const hasSameSalesIncrement = previousSettings.salesIncrement === normalizedSettings.salesIncrement;
-                const hasSameDotBlueRange = (
-                    previousSettings.dotBlueSpawnFrequencyRange.min === normalizedSettings.dotBlueSpawnFrequencyRange.min
-                    && previousSettings.dotBlueSpawnFrequencyRange.max === normalizedSettings.dotBlueSpawnFrequencyRange.max
-                );
-                const hasSameTickerItems = JSON.stringify(previousSettings.tickerItemsByLanguage) === JSON.stringify(normalizedSettings.tickerItemsByLanguage);
-
-                if (hasSameSalesCount && hasSameSalesIncrement && hasSameDotBlueRange && hasSameTickerItems) {
-                    return previousSettings;
-                }
-
-                return normalizedSettings;
-            });
-            setSyncedSales(normalizedSettings.currentSalesCount);
-            pendingSalesHitsRef.current = Math.max(0, pendingSalesHitsRef.current - incrementBy);
-            setPendingSalesHits((previousValue) => Math.max(0, previousValue - incrementBy));
-        } catch (error) {
-            console.error('판매 카운트 증가분을 저장하지 못했습니다.', error);
-        } finally {
-            isSyncingSalesRef.current = false;
-        }
-    }, []);
+    }, [applySalesDifferenceAnimation, scheduleNextPublicSettingsPoll, syncDisplayedSalesToServer]);
 
     useEffect(() => {
         loadPublicSiteSettings({ revealSales: true });
-
-        publicSettingsPollingIntervalRef.current = window.setInterval(() => {
-            loadPublicSiteSettings();
-        }, publicSettingsPollingIntervalMs);
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 const now = Date.now();
                 const elapsedSinceLastRequest = now - lastPublicSiteSettingsRequestAtRef.current;
 
-                if (elapsedSinceLastRequest < publicSettingsFocusThrottleMs) {
+                if (elapsedSinceLastRequest < PUBLIC_SETTINGS_FOCUS_THROTTLE_MS) {
                     return;
                 }
 
-                loadPublicSiteSettings();
+                loadPublicSiteSettings({ reschedule: true });
             }
         };
 
@@ -217,65 +272,22 @@ export default function Dashboard() {
                 window.clearTimeout(salesRevealTimeoutRef.current);
             }
 
-            if (salesSyncTimeoutRef.current) {
-                window.clearTimeout(salesSyncTimeoutRef.current);
-            }
-
-            if (publicSettingsPollingIntervalRef.current) {
-                window.clearInterval(publicSettingsPollingIntervalRef.current);
+            if (publicSettingsPollingTimeoutRef.current) {
+                window.clearTimeout(publicSettingsPollingTimeoutRef.current);
             }
 
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [loadPublicSiteSettings, publicSettingsFocusThrottleMs, publicSettingsPollingIntervalMs]);
-
-    useEffect(() => {
-        if (pendingSalesHits <= 0) {
-            if (salesSyncTimeoutRef.current) {
-                window.clearTimeout(salesSyncTimeoutRef.current);
-                salesSyncTimeoutRef.current = null;
-            }
-
-            return undefined;
-        }
-
-        if (salesSyncTimeoutRef.current) {
-            window.clearTimeout(salesSyncTimeoutRef.current);
-        }
-
-        salesSyncTimeoutRef.current = window.setTimeout(() => {
-            flushPendingSalesHits();
-        }, SALES_SYNC_DEBOUNCE_MS);
-
-        return () => {
-            if (salesSyncTimeoutRef.current) {
-                window.clearTimeout(salesSyncTimeoutRef.current);
-                salesSyncTimeoutRef.current = null;
-            }
-        };
-    }, [flushPendingSalesHits, pendingSalesHits]);
-
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden' && pendingSalesHitsRef.current > 0) {
-                flushPendingSalesHits();
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [flushPendingSalesHits]);
+    }, [loadPublicSiteSettings]);
 
     useEffect(() => {
         return () => {
             if (pulseTimeoutRef.current) {
-                clearTimeout(pulseTimeoutRef.current);
+                window.clearTimeout(pulseTimeoutRef.current);
             }
+
             if (lineTimeoutRef.current) {
-                clearTimeout(lineTimeoutRef.current);
+                window.clearTimeout(lineTimeoutRef.current);
             }
         };
     }, []);
@@ -364,29 +376,36 @@ export default function Dashboard() {
         };
     }, []);
 
-    const handleHit = useCallback(() => {
-        pendingSalesHitsRef.current += 1;
-        setPendingSalesHits((prev) => prev + 1);
-        setIsPulsing(false);
-        setIsLineHit(false);
-        if (pulseTimeoutRef.current) {
-            clearTimeout(pulseTimeoutRef.current);
+    const handleBlueAnimationHit = useCallback(() => {
+        if (activeBlueAnimationCountRef.current <= 0) {
+            return;
         }
-        if (lineTimeoutRef.current) {
-            clearTimeout(lineTimeoutRef.current);
+
+        activeBlueAnimationCountRef.current = 0;
+        triggerSalesPulse();
+
+        setDisplayedSales((previousValue) => {
+            const nextValue = previousValue + 1;
+            displayedSalesRef.current = nextValue;
+            return nextValue;
+        });
+
+        if (pendingBlueAnimationCountRef.current > 0) {
+            launchNextBlueAnimation();
+            return;
         }
-        requestAnimationFrame(() => setIsPulsing(true));
-        requestAnimationFrame(() => setIsLineHit(true));
-        pulseTimeoutRef.current = setTimeout(() => {
-            setIsPulsing(false);
-        }, 1300);
-        lineTimeoutRef.current = setTimeout(() => {
-            setIsLineHit(false);
-        }, 500);
-        if (pendingSalesHitsRef.current >= SALES_SYNC_BATCH_SIZE) {
-            flushPendingSalesHits();
-        }
-    }, [flushPendingSalesHits]);
+
+        window.setTimeout(() => {
+            if (pendingBlueAnimationCountRef.current > 0 || activeBlueAnimationCountRef.current > 0) {
+                return;
+            }
+
+            if (displayedSalesRef.current < targetSalesCountRef.current) {
+                setDisplayedSales(targetSalesCountRef.current);
+                displayedSalesRef.current = targetSalesCountRef.current;
+            }
+        }, 120);
+    }, [launchNextBlueAnimation, triggerSalesPulse]);
 
     const handleCloseInquiryModal = useCallback(() => {
         setIsInquiryModalOpen(false);
@@ -427,10 +446,12 @@ export default function Dashboard() {
                     collisionRadius={targetMetrics.collisionRadius}
                 />
                 <DotBlueEngine
-                    onHit={handleHit}
+                    onHit={handleBlueAnimationHit}
                     targetCenter={targetMetrics.center}
                     collisionRadius={targetMetrics.collisionRadius}
                     spawnFrequencyRange={siteSettings.dotBlueSpawnFrequencyRange}
+                    shouldAutoSpawn={false}
+                    manualSpawnSignal={blueManualSpawnSignal}
                 />
             </div>
 

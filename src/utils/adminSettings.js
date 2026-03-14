@@ -72,21 +72,18 @@ export function normalizeAdminSiteSettings(settings) {
     const normalizedSalesCount = Number.isFinite(Number(settings?.salesCount)) && Number(settings?.salesCount) >= 0
         ? Number(settings.salesCount)
         : DEFAULT_SALES_COUNT;
-    const normalizedSalesIncrement = Number.isFinite(Number(settings?.salesIncrement)) && Number(settings?.salesIncrement) >= 0
-        ? Number(settings.salesIncrement)
-        : 0;
     const normalizedCurrentSalesCount = Number.isFinite(Number(settings?.currentSalesCount)) && Number(settings?.currentSalesCount) >= 0
         ? Number(settings.currentSalesCount)
-        : normalizedSalesCount + normalizedSalesIncrement;
+        : normalizedSalesCount;
 
     return {
         notificationEmail: typeof settings?.notificationEmail === 'string' ? settings.notificationEmail : '',
         salesCount: normalizedSalesCount,
-        salesIncrement: normalizedSalesIncrement,
         currentSalesCount: normalizedCurrentSalesCount,
         dotBlueSpawnFrequencyRange: normalizeDotBlueSpawnFrequencyRange(settings?.dotBlueSpawnFrequencyRange),
         tickerItemsByLanguage: normalizeTickerItemsByLanguageMap(settings?.tickerItemsByLanguage),
         updatedAt: typeof settings?.updatedAt === 'string' ? settings.updatedAt : '',
         salesUpdatedAt: typeof settings?.salesUpdatedAt === 'string' ? settings.salesUpdatedAt : '',
+        lastSalesTickAt: typeof settings?.lastSalesTickAt === 'string' ? settings.lastSalesTickAt : '',
     };
 }

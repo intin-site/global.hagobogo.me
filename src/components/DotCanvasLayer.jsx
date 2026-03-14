@@ -113,6 +113,7 @@ function updateLineDots({
     maxSpawnDelayMs,
     spawnTimerRef,
     onHit,
+    shouldAutoSpawn,
 }) {
     const nextDots = [];
     let didHit = false;
@@ -167,8 +168,11 @@ function updateLineDots({
         onHit();
     }
 
-    spawnTimerRef.current -= deltaTime;
-    if (spawnTimerRef.current <= 0) {
+    if (shouldAutoSpawn) {
+        spawnTimerRef.current -= deltaTime;
+    }
+
+    if (shouldAutoSpawn && spawnTimerRef.current <= 0) {
         const { dot, nextSpawnDelayMs } = createLineDot(time, minSpawnDelayMs, maxSpawnDelayMs);
         nextDots.push(dot);
         spawnTimerRef.current = nextSpawnDelayMs;
@@ -370,6 +374,8 @@ export default function DotCanvasLayer({
     sphereRadius,
     onHit,
     spawnFrequencyRange,
+    shouldAutoSpawn = true,
+    manualSpawnSignal = 0,
     className,
 }) {
     const canvasRef = useRef(null);
@@ -383,6 +389,8 @@ export default function DotCanvasLayer({
     const sphereRadiusRef = useRef(sphereRadius);
     const onHitRef = useRef(onHit);
     const spawnFrequencyRangeRef = useRef(spawnFrequencyRange);
+    const manualSpawnSignalRef = useRef(manualSpawnSignal);
+    const shouldAutoSpawnRef = useRef(shouldAutoSpawn);
 
     useEffect(() => {
         targetCenterRef.current = targetCenter;
@@ -403,6 +411,35 @@ export default function DotCanvasLayer({
     useEffect(() => {
         spawnFrequencyRangeRef.current = spawnFrequencyRange;
     }, [spawnFrequencyRange]);
+
+    useEffect(() => {
+        shouldAutoSpawnRef.current = shouldAutoSpawn;
+    }, [shouldAutoSpawn]);
+
+    useEffect(() => {
+        if (variant !== 'blue') {
+            manualSpawnSignalRef.current = manualSpawnSignal;
+            return;
+        }
+
+        const nextSignal = Number(manualSpawnSignal);
+        const previousSignal = Number(manualSpawnSignalRef.current);
+        const manualSpawnCount = Math.max(0, nextSignal - previousSignal);
+
+        if (manualSpawnCount > 0) {
+            const config = getVariantConfig(variant, spawnFrequencyRangeRef.current);
+            const timeBase = (typeof window !== 'undefined' && window.performance?.now)
+                ? window.performance.now()
+                : Date.now();
+
+            for (let index = 0; index < manualSpawnCount; index += 1) {
+                const { dot } = createLineDot(timeBase + index, config.minSpawnDelayMs, config.maxSpawnDelayMs);
+                dotsRef.current.push(dot);
+            }
+        }
+
+        manualSpawnSignalRef.current = manualSpawnSignal;
+    }, [manualSpawnSignal, variant]);
 
     useEffect(() => {
         const config = getVariantConfig(variant, spawnFrequencyRange);
@@ -457,6 +494,7 @@ export default function DotCanvasLayer({
                         maxSpawnDelayMs: config.maxSpawnDelayMs,
                         spawnTimerRef,
                         onHit: onHitRef.current,
+                        shouldAutoSpawn: shouldAutoSpawnRef.current,
                     });
                 }
             }
@@ -480,7 +518,9 @@ export default function DotCanvasLayer({
                 spawnTimerRef.current = EMPTY_MIN_SPAWN_DELAY_MS;
             } else {
                 const config = getVariantConfig(variant, spawnFrequencyRangeRef.current);
-                spawnTimerRef.current = config.minSpawnDelayMs + Math.random() * (config.maxSpawnDelayMs - config.minSpawnDelayMs);
+                spawnTimerRef.current = shouldAutoSpawnRef.current
+                    ? config.minSpawnDelayMs + Math.random() * (config.maxSpawnDelayMs - config.minSpawnDelayMs)
+                    : Number.POSITIVE_INFINITY;
             }
         };
 
