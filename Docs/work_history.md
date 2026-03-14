@@ -3,6 +3,11 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 14:41 - 판매 수치 재조회 시 로컬 클릭 증가분 초기화되는 UX 버그 수정
+- `src/components/Dashboard.jsx`의 판매 수치 상태를 `baseSales`와 `localHits`로 분리해, 서버에서 다시 불러온 기준값과 현재 브라우저에서 누적된 클릭 증가분이 서로 덮어쓰지 않도록 수정
+- 메인 화면 숫자는 `서버 기준값 + 로컬 클릭 증가분`으로 계산되도록 변경해 60초 폴링이나 탭 복귀 재조회 이후에도 화면 숫자가 갑자기 떨어지지 않도록 정리
+- 검증 결과 `npm run lint`, `npm run build` 모두 다시 통과 확인
+
 ## 2026-03-14 14:00 - 관리자 부분 저장과 다중 브라우저 공개 설정 재조회 반영
 - `src/components/AdminPage.jsx`, `src/lib/adminApi.js`, `apps-script/business-inquiry/Code.gs`를 수정해 뉴스정보, 판매 수치, Dot_blue 빈도, 알림 메일 저장이 각각 자기 항목만 서버에 부분 저장되도록 구조를 변경
 - `src/components/AdminPage.jsx`, `src/components/Dashboard.jsx`를 수정해 비어 있는 ticker 배열을 기본 문구로 되돌리지 않고 그대로 유지하며, 메인 화면에서는 ticker가 완전히 비어 있으면 노출하지 않도록 정리

@@ -48,7 +48,8 @@ export default function Dashboard() {
     const publicSettingsPollingIntervalMs = 60000;
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
-    const [sales, setSales] = useState(DEFAULT_SALES_COUNT);
+    const [baseSales, setBaseSales] = useState(DEFAULT_SALES_COUNT);
+    const [localHits, setLocalHits] = useState(0);
     const [isSalesVisible, setIsSalesVisible] = useState(false);
     const [language, setLanguage] = useState(() => {
         if (typeof window === 'undefined') {
@@ -94,6 +95,7 @@ export default function Dashboard() {
     const proposalFileName = PROPOSAL_FILE_BY_LANGUAGE[language] || PROPOSAL_FILE_BY_LANGUAGE.EN;
     const tickerItems = siteSettings.tickerItemsByLanguage[language] || [];
     const visibleTickerItems = tickerItems;
+    const displayedSales = baseSales + localHits;
 
     const loadPublicSiteSettings = useCallback(async ({ revealSales = false } = {}) => {
         if (isFetchingPublicSiteSettingsRef.current) {
@@ -120,7 +122,7 @@ export default function Dashboard() {
 
                 return normalizedSettings;
             });
-            setSales(normalizedSettings.salesCount);
+            setBaseSales(normalizedSettings.salesCount);
 
             if (revealSales) {
                 if (salesRevealTimeoutRef.current) {
@@ -329,7 +331,7 @@ export default function Dashboard() {
     }, []);
 
     const handleHit = useCallback(() => {
-        setSales((prev) => prev + 1);
+        setLocalHits((prev) => prev + 1);
         setIsPulsing(false);
         setIsLineHit(false);
         if (pulseTimeoutRef.current) {
@@ -492,7 +494,7 @@ export default function Dashboard() {
                     <Sphere isLineHit={isLineHit} />
                     <div className="absolute inset-0 flex items-center justify-center">
                         <SalesCounter
-                            sales={sales}
+                            sales={displayedSales}
                             isPulsing={isPulsing}
                             isVisible={isSalesVisible}
                             mode="center"
