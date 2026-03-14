@@ -18,6 +18,7 @@ const SUPPORTED_LANGUAGES = ['EN', 'FR', 'ES', 'KR'];
 const BUSINESS_INQUIRIES_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1_ubB52DuzvOOfW3RQ6vuoKrwG6oAozwldMOyshWPePw/edit?gid=0#gid=0';
 const STATUS_HEADER_NAME = 'Status';
 const DUPLICATE_SUBMISSION_WINDOW_SECONDS = 120;
+const SCRIPT_LOCK_WAIT_TIMEOUT_MS = 10000;
 
 function doGet() {
   // 웹앱이 살아 있는지 간단히 확인할 수 있는 상태 확인 응답입니다.
@@ -72,25 +73,33 @@ function doPost(e) {
       });
     }
 
-    const statusColumnIndex = getStatusColumnIndex(sheet);
+    const savedRowIndex = runWithScriptLock(function() {
+      const statusColumnIndex = getStatusColumnIndex(sheet);
 
-    // 시트에 데이터 추가
-    sheet.appendRow([
-      formatDateCell(submittedAt),
-      formatTimeCell(submittedAt),
-      payload.name.trim(),
-      payload.title ? payload.title.trim() : '',
-      payload.country.trim(),
-      payload.companyName.trim(),
-      payload.email.trim(),
-      payload.inquiry.trim()
-    ]);
+      // 시트에 데이터 추가와 행 번호 확인을 같은 잠금 구간에서 처리해 동시 접수 시 순서가 섞이지 않게 합니다.
+      sheet.appendRow([
+        formatDateCell(submittedAt),
+        formatTimeCell(submittedAt),
+        payload.name.trim(),
+        payload.title ? payload.title.trim() : '',
+        payload.country.trim(),
+        payload.companyName.trim(),
+        payload.email.trim(),
+        payload.inquiry.trim()
+      ]);
+
+      return {
+        rowIndex: sheet.getLastRow(),
+        statusColumnIndex: statusColumnIndex
+      };
+    });
 
     // 저장 직후 관리자 알림 메일을 보내고, 결과를 Status 열에 함께 남깁니다.
-    const savedRowIndex = sheet.getLastRow();
     const mailResult = sendNotificationEmail(payload, submittedAt);
 
-    updateStatusCell(sheet, savedRowIndex, statusColumnIndex, mailResult.statusText);
+    runWithScriptLock(function() {
+      updateStatusCell(sheet, savedRowIndex.rowIndex, savedRowIndex.statusColumnIndex, mailResult.statusText);
+    });
     markSubmissionCache(payload);
 
     return createJsonResponse({
@@ -277,20 +286,40 @@ function getSiteSettings() {
 
 function saveSiteSettings(siteSettings) {
   // 관리자 화면에서 전달한 변경 항목만 현재 설정과 병합해 저장합니다.
-  const currentSettings = getSiteSettings();
-  const nextSettings = mergeSiteSettings(currentSettings, normalizeSiteSettingsPatch(siteSettings));
-  const scriptProperties = PropertiesService.getScriptProperties();
-  const updatedAt = new Date().toISOString();
+  return runWithScriptLock(function() {
+    const currentSettings = getSiteSettings();
+    const nextSettings = mergeSiteSettings(currentSettings, normalizeSiteSettingsPatch(siteSettings));
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const updatedAt = new Date().toISOString();
 
-  scriptProperties.setProperty(NOTIFICATION_EMAIL_PROPERTY_KEY, nextSettings.notificationEmail);
-  scriptProperties.setProperty(SALES_COUNT_PROPERTY_KEY, String(nextSettings.salesCount));
-  scriptProperties.setProperty(DOT_BLUE_RANGE_PROPERTY_KEY, JSON.stringify(nextSettings.dotBlueSpawnFrequencyRange));
-  scriptProperties.setProperty(TICKER_ITEMS_PROPERTY_KEY, JSON.stringify(nextSettings.tickerItemsByLanguage));
-  scriptProperties.setProperty(SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY, updatedAt);
+    // 여러 설정값을 한 번에 기록해 저장 중 일부만 반영되는 반쪽 상태를 막습니다.
+    scriptProperties.setProperties({
+      [NOTIFICATION_EMAIL_PROPERTY_KEY]: nextSettings.notificationEmail,
+      [SALES_COUNT_PROPERTY_KEY]: String(nextSettings.salesCount),
+      [DOT_BLUE_RANGE_PROPERTY_KEY]: JSON.stringify(nextSettings.dotBlueSpawnFrequencyRange),
+      [TICKER_ITEMS_PROPERTY_KEY]: JSON.stringify(nextSettings.tickerItemsByLanguage),
+      [SITE_SETTINGS_UPDATED_AT_PROPERTY_KEY]: updatedAt
+    });
 
-  return mergeSiteSettings(nextSettings, {
-    updatedAt: updatedAt
+    return mergeSiteSettings(nextSettings, {
+      updatedAt: updatedAt
+    });
   });
+}
+
+function runWithScriptLock(callback) {
+  // 공유 데이터 변경 구간은 전역 잠금을 걸어 동시에 수정되어 값이 섞이지 않게 보호합니다.
+  const lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(SCRIPT_LOCK_WAIT_TIMEOUT_MS)) {
+    throw new Error('잠시 다른 요청을 처리 중입니다. 잠시 후 다시 시도해 주세요.');
+  }
+
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getAdminPassword() {

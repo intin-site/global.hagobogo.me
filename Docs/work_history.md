@@ -3,6 +3,17 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 15:14 - Apps Script 잠금과 API timeout, 탭 복귀 재조회 throttle 보강
+- `apps-script/business-inquiry/Code.gs`에 전역 잠금 헬퍼를 추가하고 관리자 설정 저장을 `setProperties()` 일괄 기록으로 바꿔 동시 저장 충돌과 반쪽 저장 가능성을 줄이도록 보강
+- 문의 시트 `appendRow()`와 상태 열 기록도 잠금 구간으로 감싸 동시에 접수될 때 행 번호와 상태 기록이 뒤섞이지 않도록 정리
+- `src/lib/adminApi.js`, `src/lib/inquiryApi.js`에 `AbortController` 기반 12초 timeout을 추가해 응답 지연 시 무한 대기 대신 명확한 오류 메시지를 반환하도록 수정
+- `src/components/Dashboard.jsx`에 탭 복귀 재조회 15초 throttle을 추가해 짧은 시간 안의 반복 `visibilitychange`가 공개 설정 API를 과도하게 호출하지 않도록 보강
+- 검증 결과 `npm run lint`, `npm run build` 모두 통과 확인
+
+## 2026-03-14 15:01 - 잠재 문제 3건에 대한 실제 수정 계획서 작성
+- Apps Script 동시성 잠금, 프론트엔드 fetch timeout, 대시보드 포커스 재조회 throttle 문제를 현재 코드 기준으로 다시 검토
+- 구현 전 단계로 우선순위, 수정 범위, 예상 동작 변화, 검증 시나리오를 포함한 실제 수정 계획서를 정리
+
 ## 2026-03-14 14:41 - 판매 수치 재조회 시 로컬 클릭 증가분 초기화되는 UX 버그 수정
 - `src/components/Dashboard.jsx`의 판매 수치 상태를 `baseSales`와 `localHits`로 분리해, 서버에서 다시 불러온 기준값과 현재 브라우저에서 누적된 클릭 증가분이 서로 덮어쓰지 않도록 수정
 - 메인 화면 숫자는 `서버 기준값 + 로컬 클릭 증가분`으로 계산되도록 변경해 60초 폴링이나 탭 복귀 재조회 이후에도 화면 숫자가 갑자기 떨어지지 않도록 정리

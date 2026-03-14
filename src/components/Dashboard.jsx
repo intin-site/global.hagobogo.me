@@ -46,6 +46,7 @@ function createInitialTargetMetrics() {
 
 export default function Dashboard() {
     const publicSettingsPollingIntervalMs = 60000;
+    const publicSettingsFocusThrottleMs = 15000;
     const homeHref = `${import.meta.env.BASE_URL || './'}app.html`;
     const adminHref = `${import.meta.env.BASE_URL || './'}app.html?view=admin`;
     const [baseSales, setBaseSales] = useState(DEFAULT_SALES_COUNT);
@@ -83,6 +84,7 @@ export default function Dashboard() {
     const salesRevealTimeoutRef = useRef(null);
     const publicSettingsPollingIntervalRef = useRef(null);
     const isFetchingPublicSiteSettingsRef = useRef(false);
+    const lastPublicSiteSettingsRequestAtRef = useRef(0);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
     const proposalBoardRef = useRef(null);
@@ -103,6 +105,7 @@ export default function Dashboard() {
         }
 
         isFetchingPublicSiteSettingsRef.current = true;
+        lastPublicSiteSettingsRequestAtRef.current = Date.now();
 
         try {
             const nextSiteSettings = await fetchPublicSiteSettings();
@@ -155,6 +158,13 @@ export default function Dashboard() {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
+                const now = Date.now();
+                const elapsedSinceLastRequest = now - lastPublicSiteSettingsRequestAtRef.current;
+
+                if (elapsedSinceLastRequest < publicSettingsFocusThrottleMs) {
+                    return;
+                }
+
                 loadPublicSiteSettings();
             }
         };
@@ -172,7 +182,7 @@ export default function Dashboard() {
 
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [loadPublicSiteSettings, publicSettingsPollingIntervalMs]);
+    }, [loadPublicSiteSettings, publicSettingsFocusThrottleMs, publicSettingsPollingIntervalMs]);
 
     useEffect(() => {
         return () => {

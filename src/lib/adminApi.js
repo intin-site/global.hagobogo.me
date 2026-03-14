@@ -1,5 +1,7 @@
 import { normalizeAdminSiteSettings } from '../utils/adminSettings';
 
+const ADMIN_API_TIMEOUT_MS = 12000;
+
 function getAdminSettingsApiUrl() {
     const value = import.meta.env.VITE_ADMIN_SETTINGS_API_URL?.trim() || '';
     return value.startsWith('REPLACE_WITH_') ? '' : value;
@@ -19,6 +21,31 @@ async function readJsonResponse(response, fallbackMessage) {
     }
 }
 
+async function fetchWithTimeout(url, options, timeoutMs) {
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+        abortController.abort();
+    }, timeoutMs);
+
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: abortController.signal,
+        });
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            const timeoutError = new Error('관리자 설정 요청 응답이 지연되어 통신을 중단했습니다. 잠시 후 다시 시도해 주세요.');
+            timeoutError.code = 'TIMEOUT_ERROR';
+            timeoutError.cause = error;
+            throw timeoutError;
+        }
+
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
 async function postAdminRequest(payload) {
     const adminSettingsApiUrl = getAdminSettingsApiUrl();
 
@@ -31,14 +58,22 @@ async function postAdminRequest(payload) {
     let response;
 
     try {
-        response = await fetch(adminSettingsApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8',
+        response = await fetchWithTimeout(
+            adminSettingsApiUrl,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
+                body: JSON.stringify(payload),
             },
-            body: JSON.stringify(payload),
-        });
+            ADMIN_API_TIMEOUT_MS
+        );
     } catch (error) {
+        if (error?.code === 'TIMEOUT_ERROR') {
+            throw error;
+        }
+
         const networkError = new Error('관리자 설정 요청 중 네트워크 오류가 발생했습니다.');
         networkError.code = 'NETWORK_ERROR';
         networkError.cause = error;
