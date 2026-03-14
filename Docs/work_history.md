@@ -3,6 +3,16 @@
 > [!NOTE]
 > 모든 작업 이력은 최신 날짜와 시간이 상단에 오도록 기록합니다.
 
+## 2026-03-14 16:31 - Dot 엔진 Canvas 전환과 제안서 iframe postMessage 높이 동기화 반영
+- `src/components/DotCanvasLayer.jsx`를 추가하고 기존 `DotEngine`, `DotBlueEngine`, `DotEmptyEngine`의 React state 기반 DOM 렌더링을 Canvas 기반 직접 렌더링으로 교체해 매 프레임 React 재렌더링 부담을 제거
+- `src/components/Dashboard.jsx`에서 iframe 내부 문서를 직접 `ResizeObserver`로 관찰하던 구조를 제거하고, 제안서 문서가 부모에게 높이를 보내는 `postMessage` 기반 수신 구조로 전환
+- `assets/data`, `public/assets/data`의 언어별 제안서 HTML에 높이 측정 스크립트를 추가해 로드, 리사이즈, 폰트 반영 시 부모 페이지로 최신 높이를 다시 전달하도록 정리
+- 검증 결과 `npm run lint`, `npm run build` 모두 통과 확인
+
+## 2026-03-14 16:22 - Dot 엔진 렌더링 구조와 iframe 높이 동기화 개선 계획서 작성
+- `useDotEngine` 계열의 매 프레임 React state 갱신 구조와 `Dashboard.jsx`의 iframe `ResizeObserver` 기반 높이 동기화 구조를 현재 코드 기준으로 다시 검토
+- 구현 전 단계로 성능 병목 원인, 우선순위, 단계별 전환 방식, 초보자용 설명, 검증 시나리오를 포함한 실제 수정 계획서를 정리
+
 ## 2026-03-14 15:57 - 문의 시트 저장을 텍스트 형식 직접 지정 방식으로 강화
 - `apps-script/business-inquiry/Code.gs`의 문의 저장 로직을 `appendRow()` 중심 구조에서 다음 행 `Range`를 직접 잡아 텍스트 형식을 먼저 지정한 뒤 `setValues()` 하는 방식으로 보강
 - 기존 수식 시작 문자 이스케이프에 더해 셀 자체를 텍스트 형식으로 고정해 Formula Injection 방어가 실제 시트 저장 단계에서 더 강하게 적용되도록 정리

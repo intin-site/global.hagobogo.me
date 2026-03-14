@@ -124,5 +124,48 @@
     });
   }());
 </script>
+<script>
+  (function () {
+    const MESSAGE_TYPE = 'HAGOBOGO_PROPOSAL_HEIGHT';
+    let postHeightRafId = 0;
+
+    function postHeightToParent() {
+      const nextHeight = Math.max(
+        document.documentElement ? document.documentElement.scrollHeight : 0,
+        document.body ? document.body.scrollHeight : 0,
+        document.documentElement ? document.documentElement.offsetHeight : 0,
+        document.body ? document.body.offsetHeight : 0
+      );
+
+      window.parent.postMessage({
+        type: MESSAGE_TYPE,
+        height: nextHeight
+      }, '*');
+    }
+
+    function schedulePostHeight() {
+      if (postHeightRafId) {
+        window.cancelAnimationFrame(postHeightRafId);
+      }
+
+      postHeightRafId = window.requestAnimationFrame(postHeightToParent);
+    }
+
+    const resizeObserver = new ResizeObserver(schedulePostHeight);
+    resizeObserver.observe(document.body);
+    resizeObserver.observe(document.documentElement);
+
+    window.addEventListener('load', schedulePostHeight);
+    window.addEventListener('resize', schedulePostHeight);
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(schedulePostHeight).catch(function () {});
+    }
+
+    window.setTimeout(schedulePostHeight, 150);
+    window.setTimeout(schedulePostHeight, 450);
+    schedulePostHeight();
+  }());
+</script>
 </body>
 </html>

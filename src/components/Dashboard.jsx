@@ -19,6 +19,7 @@ import {
 import { fetchPublicSiteSettings } from '../lib/adminApi';
 
 const LANGUAGE_STORAGE_KEY = 'site_language';
+const PROPOSAL_HEIGHT_MESSAGE_TYPE = 'HAGOBOGO_PROPOSAL_HEIGHT';
 const PROPOSAL_FILE_BY_LANGUAGE = {
     EN: 'Hagobogo_Proposal_en_v01.html',
     ES: 'Hagobogo_Proposal_es_v01.html',
@@ -87,10 +88,7 @@ export default function Dashboard() {
     const lastPublicSiteSettingsRequestAtRef = useRef(0);
     const sphereGroupRef = useRef(null);
     const languageMenuRef = useRef(null);
-    const proposalBoardRef = useRef(null);
     const proposalIframeRef = useRef(null);
-    const proposalResizeObserverRef = useRef(null);
-    const proposalResizeRafRef = useRef(null);
     const [proposalFrameHeight, setProposalFrameHeight] = useState(1180);
     const copy = TRANSLATIONS[language];
     const chatbotQuestions = CHATBOT_FAQ[language] || CHATBOT_FAQ.EN || [];
@@ -217,94 +215,33 @@ export default function Dashboard() {
         };
     }, []);
 
-    const updateProposalFrameHeight = useCallback(() => {
-        const iframe = proposalIframeRef.current;
-        const iframeDocument = iframe?.contentWindow?.document;
-
-        if (!iframeDocument) {
-            return;
-        }
-
-        // 이전에 커진 iframe 높이가 다시 측정값에 섞이지 않도록 잠시 접은 뒤 실제 문서 높이를 읽음
-        const previousInlineHeight = iframe.style.height;
-        iframe.style.height = '0px';
-
-        const nextHeight = Math.max(
-            iframeDocument.documentElement?.scrollHeight || 0,
-            iframeDocument.body?.scrollHeight || 0
-        );
-
-        iframe.style.height = previousInlineHeight;
-
-        if (nextHeight > 0) {
-            setProposalFrameHeight(nextHeight);
-        }
-    }, []);
+    useEffect(() => {
+        setProposalFrameHeight(1180);
+    }, [proposalFileName]);
 
     useEffect(() => {
-        return () => {
-            proposalResizeObserverRef.current?.disconnect();
-            if (proposalResizeRafRef.current) {
-                window.cancelAnimationFrame(proposalResizeRafRef.current);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        const iframe = proposalIframeRef.current;
-
-        if (!iframe) {
-            return;
-        }
-
-        const connectResizeObserver = () => {
-            proposalResizeObserverRef.current?.disconnect();
-
-            const iframeDocument = iframe.contentWindow?.document;
-            if (!iframeDocument?.body) {
+        const handleProposalHeightMessage = (event) => {
+            if (event.source !== proposalIframeRef.current?.contentWindow) {
                 return;
             }
 
-            updateProposalFrameHeight();
-
-            proposalResizeObserverRef.current = new ResizeObserver(() => {
-                updateProposalFrameHeight();
-            });
-            proposalResizeObserverRef.current.observe(iframeDocument.body);
-            proposalResizeObserverRef.current.observe(iframeDocument.documentElement);
-        };
-
-        const handleLoad = () => {
-            connectResizeObserver();
-            window.requestAnimationFrame(updateProposalFrameHeight);
-            window.setTimeout(updateProposalFrameHeight, 150);
-            window.setTimeout(updateProposalFrameHeight, 450);
-        };
-
-        const handleWindowResize = () => {
-            if (proposalResizeRafRef.current) {
-                window.cancelAnimationFrame(proposalResizeRafRef.current);
+            if (event.data?.type !== PROPOSAL_HEIGHT_MESSAGE_TYPE) {
+                return;
             }
 
-            proposalResizeRafRef.current = window.requestAnimationFrame(() => {
-                updateProposalFrameHeight();
-            });
+            const nextHeight = Number(event.data.height);
+
+            if (Number.isFinite(nextHeight) && nextHeight > 0) {
+                setProposalFrameHeight(nextHeight);
+            }
         };
 
-        iframe.addEventListener('load', handleLoad);
-        window.addEventListener('resize', handleWindowResize);
-
-        handleLoad();
+        window.addEventListener('message', handleProposalHeightMessage);
 
         return () => {
-            iframe.removeEventListener('load', handleLoad);
-            window.removeEventListener('resize', handleWindowResize);
-            proposalResizeObserverRef.current?.disconnect();
-            if (proposalResizeRafRef.current) {
-                window.cancelAnimationFrame(proposalResizeRafRef.current);
-            }
+            window.removeEventListener('message', handleProposalHeightMessage);
         };
-    }, [proposalFileName, updateProposalFrameHeight]);
+    }, []);
 
     useEffect(() => {
         const updateTargetMetrics = () => {
@@ -524,7 +461,6 @@ export default function Dashboard() {
                 </div>
 
                 <div
-                    ref={proposalBoardRef}
                     className="introduction-board"
                     style={{ height: `${proposalFrameHeight}px` }}
                 >
